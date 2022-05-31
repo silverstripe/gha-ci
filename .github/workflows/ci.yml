@@ -1,0 +1,453 @@
+name: ci
+
+on:
+  workflow_call:
+    inputs:
+      # extra jobs must be multi-line string, as there's no support for type: array for inputs
+      extra_jobs:
+        type: string
+        required: false
+        default: ''
+      composer_require_extra:
+        type: string
+        required: false
+        default: ''
+      # simple matrix will only run a single php 7.4 mysql 5.7 job instead of a full matrix
+      # TODO: change to matrix_options - 'simple disabled' space separated, allows for future config
+      # disabled would have no auto generated and only output extra_jobs
+      simple_matrix:
+        type: boolean
+        default: false
+      endtoend:
+        type: boolean
+        default: true
+      phpcoverage:
+        type: boolean
+        # modules on silverstripe account will ignore this and always run codecov
+        default: false
+      phplinting:
+        type: boolean
+        default: true
+      phpunit:
+        type: boolean
+        default: true
+      js:
+        type: boolean
+        default: true
+
+jobs:
+
+  context:
+    name: Context
+    runs-on: ubuntu-latest
+    env:
+      # Put this through an env variable to prevent possible string substitution injection via pull-request branch name
+      GITHUB_HEAD_REF: ${{ github.head_ref }}
+    steps:
+      - name: Context
+        run: |
+          # https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
+          # github.base_ref - The target branch of the pull request in a workflow run.
+          echo "github.base_ref: ${{ github.base_ref }}"
+          # github.head_ref - The source branch of the pull request in a workflow run.
+          echo "github.head_ref: $GITHUB_HEAD_REF"
+          # github.ref - The branch or tag ref that triggered the workflow run. 
+          # For branches this is the format refs/heads/<branch_name>, and for tags it is refs/tags/<tag_name>
+          echo "github.ref: ${{ github.ref }}"
+          # github.ref_name - The branch or tag name that triggered the workflow run
+          echo "github.ref_name: ${{ github.ref_name }}"
+          # githbub.repository - The owner and repository name. For example, Codertocat/Hello-World
+          # TODO: ensure this is the target account/repo in a pull-request
+          echo "$github.repository: ${{ github.repository }}"
+
+  genmatrix:
+    name: Generate matrix
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate-matrix.outputs.matrix }}
+    
+    steps:
+      - name: Generate matrix
+        id: generate-matrix
+        uses: emteknetnz/gha-generate-matrix@main
+        with:
+          extra_jobs: ${{ inputs.extra_jobs }}
+          simple_matrix: ${{ inputs.simple_matrix }}
+          endtoend: ${{ inputs.endtoend }}
+          phpcoverage: ${{ inputs.phpcoverage }}
+          phplinting: ${{ inputs.phplinting }}
+          phpunit: ${{ inputs.phpunit }}
+          js: ${{ inputs.js }}
+
+  tests:
+    needs: genmatrix
+
+    strategy:
+      # set fail-fast to false prevent one job from cancelling other jobs
+      fail-fast: false
+      matrix: ${{fromJson(needs.genmatrix.outputs.matrix)}}
+
+    runs-on: ubuntu-latest
+
+    services:
+      mysql57:
+        image: mysql:5.7
+        env:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: SS_mysite
+        ports:
+          - 3357:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+      # Takes around 9 seconds per extra database added, so this is something we could optimise later
+      mysql80:
+        image: mysql:8.0
+        env:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: SS_mysite
+        ports:
+          - 3380:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=5
+        ports:
+          - 5432:5432
+
+    env:
+      artifacts_name: >-
+        PHP ${{ matrix.php }}
+        ${{ matrix.composer_args == '--prefer-lowest' && 'prf-low' || '' }}
+        ${{ matrix.db }}
+        ${{ matrix.phpunit == 'true' && 'phpunit' || '' }}
+        ${{ matrix.phpunit == 'true' && matrix.phpunit_suite || '' }}
+        ${{ matrix.endtoend == 'true' && 'endtoend' || '' }}
+        ${{ matrix.endtoend == 'true' && matrix.endtoend_suite || '' }}
+        ${{ matrix.js == 'true' && 'js' || '' }}
+        ${{ matrix.phpcoverage == 'true' && 'phpcoverage' || '' }}
+        ${{ matrix.phplinting == 'true' && 'phplinting' || '' }}
+        ${{ matrix.name_suffix }}
+
+    name: >-
+      PHP ${{ matrix.php }}
+      ${{ matrix.composer_args == '--prefer-lowest' && 'prf-low' || '' }}
+      ${{ matrix.db }}
+      ${{ matrix.phpunit == 'true' && 'phpunit' || '' }}
+      ${{ matrix.phpunit == 'true' && matrix.phpunit_suite || '' }}
+      ${{ matrix.endtoend == 'true' && 'endtoend' || '' }}
+      ${{ matrix.endtoend == 'true' && matrix.endtoend_suite || '' }}
+      ${{ matrix.js == 'true' && 'js' || '' }}
+      ${{ matrix.phpcoverage == 'true' && 'phpcoverage' || '' }}
+      ${{ matrix.phplinting == 'true' && 'phplinting' || '' }}
+      ${{ matrix.name_suffix }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # @v2
+
+      - name: Install PHP
+        # SHA will need to be updated to support new php version when they are released
+        uses: shivammathur/setup-php@6cba851606e69e00775ebccba68bc1d418b6fa44 # @v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, dom, gd, intl, json, ldap, mbstring, mysql, tidy, xdebug, zip
+          tools: composer:v2
+          coverage: xdebug
+          # While this should be the correct way to allow forks in composer.json repositories
+          # in practice there are still many sporadic "Could not authenticate against github.com" errors
+          # there's 1,000 requests per hour limit when using this token, likely it get exceeded
+          # fairly easily when using a fork with multiple jobs in a matrix
+          #env:
+          # COMPOSER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure PHP
+        run: |
+          # Set memory limit and disable xdebug if not running phpcoverage
+          if [ -z $(which php) ]; then
+            echo "PHP not installed, skipping" && exit 0
+          fi
+
+          # github linux runners have 7GB of RAM
+          # https://docs.github.com/en/actions/using-github-hosted-runners/about-github-hosted-runners
+          # Set a high memory limit, particularly for php coverage tests
+          PHP_MEMORY_LIMIT=6144M
+          # Assign less memory for behat tests so that chrome has plenty of memory available
+          if [ "${{ matrix.endtoend }}" == "true" ]; then
+            PHP_MEMORY_LIMIT=4096M
+          fi
+          echo "PHP_MEMORY_LIMIT is $PHP_MEMORY_LIMIT"
+
+          sudo sh -c "echo 'memory_limit = $PHP_MEMORY_LIMIT' >> /etc/php/${{ matrix.php }}/cli/php.ini"
+          if [ -f /etc/php/${{ matrix.php }}/apache2/php.ini ]; then
+            sudo sh -c "echo 'memory_limit = $PHP_MEMORY_LIMIT' >> /etc/php/${{ matrix.php }}/apache2/php.ini"
+          fi
+
+          # Disable xdebug which greatly slow down unit testing
+          # Note: omitting xdebug from shivammathur/setup-php still results in xdebug being installed and enabled
+          if [ "${{ matrix.phpcoverage }}" == "true" ]; then
+            sudo sh -c "echo ';zend_extension=xdebug.so' > /etc/php/${{ matrix.php }}/mods-available/xdebug.ini"
+          fi
+          echo "PHP has been configured"
+
+      - name: Apt install additional requirements 
+        run: |
+          # apt install extra requirements as required
+          if [ "${{ matrix.endtoend }}" == "true" ]; then
+            sudo apt install -y software-properties-common
+            sudo add-apt-repository -y ppa:ondrej/php
+            sudo add-apt-repository -y ppa:ondrej/apache2
+            sudo apt update
+            sudo apt install -y libapache2-mod-php${{ matrix.php }}
+            # ubuntu-latest comes with a current version of google-chrome-stable and chromedriver
+          fi
+          if [[ "${{ github.repository }}" =~ /(spellcheck|recipe-authoring-tools)$ ]] || [ "${{ matrix.phpunit_suite }}" == "recipe-authoring-tools" ]; then
+            sudo apt install -y hunspell libhunspell-dev hunspell-en-us
+          fi
+
+      - name: Configure apache - endtoend test
+        if: ${{ matrix.endtoend == 'true' }}
+        run: |
+          # apache2 is installed and running by default in ubuntu
+          # update dir.conf to use index.php as the primary index doc
+          cat << EOF > __dir.conf
+          <IfModule mod_dir.c>
+              DirectoryIndex index.php index.html index.cgi index.pl index.xhtml index.htm
+          </IfModule>
+          EOF
+          sudo cp __dir.conf /etc/apache2/mods-enabled/dir.conf
+          rm __dir.conf
+          # this script will create a 000-default.conf file with the pwd as the DocumentRoot
+          cat << EOF > __000-default.conf
+          <VirtualHost *:80>
+            ServerAdmin webmaster@localhost
+            DocumentRoot PWD
+            <Directory PWD>
+              AllowOverride All
+              Require all granted
+            </Directory>
+            ErrorLog ${APACHE_LOG_DIR}/error.log
+            CustomLog ${APACHE_LOG_DIR}/access.log combined
+          </VirtualHost>
+          EOF
+          cat << EOF > __apache2.php
+          <?php
+          \$pwd = rtrim(trim(shell_exec('pwd')), '/');
+          \$s = file_get_contents('__000-default.conf');
+          \$s = str_replace('PWD', \$pwd, \$s);
+          file_put_contents('__000-default.conf', \$s);
+          EOF
+          php __apache2.php
+          sudo cp __000-default.conf /etc/apache2/sites-enabled/000-default.conf
+          rm __000-default.conf
+          sudo a2enmod rewrite
+          # run apache as 'runner:docker' instead of 'www-data:www-data'
+          sudo sh -c "echo 'export APACHE_RUN_USER=runner' >> /etc/apache2/envvars"
+          sudo sh -c "echo 'export APACHE_RUN_GROUP=docker' >> /etc/apache2/envvars"
+          sudo systemctl restart apache2
+          echo "Apache has been configured"
+
+      # This is shared between runs, not just jobs. It means the first time the repo runs the job it'll
+      # need to download requirements for the first time, after that it will be plenty quick
+      # https://docs.github.com/en/actions/advanced-guides/caching-dependencies-to-speed-up-workflows
+      - name: Enable shared composer cache
+        uses: actions/cache@937d24475381cd9c75ae6db12cb4e79714b926ed # @v2
+        with:
+          path: ~/.cache/composer
+          key: shared-composer-cache
+
+      - name: Composer
+        env:
+          INPUTS_COMPOSER_REQUIRE_EXTRA: ${{ inputs.composer_require_extra }}
+          MATRIX_COMPOSER_REQUIRE_EXTRA: ${{ matrix.composer_require_extra }}
+        run: |
+          # Update composer.json and install dependencies
+          # github.base_ref is only available on pull-requests events is the target branch - is is NOT prefixed with refs/heads/
+          # github.ref_name is used for regular branch builds on events push - it is NOT prefixed with refs/heads/
+          # github.ref_name is also the tag on tag events << TODO: confirm
+          # https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
+
+          # Note: $BRANCH will be tag for tag events
+          BRANCH=$(php -r "echo preg_replace('#^pulls/([0-9\.]+)/.+\$#', '\$1', '${{ github.base_ref }}'?:'${{ github.ref_name }}');")
+          if [[ "$BRANCH" =~ ^[1-9]$ ]] || [[ "$BRANCH" =~ ^[1-9]\.[0-9]+$ ]]; then export COMPOSER_ROOT_VERSION="${BRANCH}.x-dev"; elif [[ "$BRANCH" =~ ^[1-9]\.[0-9]+\.[0-9]+ ]]; then export COMPOSER_ROOT_VERSION="${BRANCH}"; else export COMPOSER_ROOT_VERSION="dev-${BRANCH}"; fi
+          echo "BRANCH is $BRANCH"
+          echo "COMPOSER_ROOT_VERSION is $COMPOSER_ROOT_VERSION"
+
+          # Detect if using phpunit9
+          # If so, then ensure sminnee phpunit5 modules do not get installed
+          PHPUNIT9=$(php -r '$rd=json_decode(file_get_contents("composer.json"))->{"require-dev"};$pu=$rd->{"phpunit/phpunit"}??"";$rt=$rd->{"silverstripe/recipe-testing"}??"";echo ($pu=="^9"||$pu=="^9.5"||$rt=="^2")?1:0;')
+          echo "PHPUNIT9 is $PHPUNIT9"
+          if [ "$PHPUNIT9" == "1" ]; then
+            php -r "\$j=json_decode(file_get_contents('composer.json'));if(!property_exists(\$j,'replace')){\$j->replace=new stdClass();};\$j->replace->{'sminnee/phpunit'}='*';\$j->replace->{'sminnee/phpunit-mock-objects'}='*';file_put_contents('composer.json',json_encode(\$j, JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES));"
+          fi
+
+          # Require silverstripe/installer for non-recipe and all but a few modules
+          if [ "${{ matrix.installer_version }}" != "" ]; then
+            composer require silverstripe/installer:${{ matrix.installer_version }} --no-update
+          fi
+          
+          # Required for assets unit tests as well as recipes that run assets unit tests
+          # Should technically be defined as composer_require_extra on individual modules, though easier just doing here
+          # 1.6.10 is for --prefer-lowest and is the minimum version with php 8.1 support
+          composer require mikey179/vfsstream:^1.6.10 --dev --no-update
+
+          if [ "${{ matrix.db }}" == "pgsql" ] && ! [[ "${{ github.repository }}" =~ /postgresql ]]; then
+            composer require silverstripe/postgresql:^2 --no-update
+          fi
+          if [ "${{ matrix.endtoend }}" == "true" ]; then
+            composer require silverstripe/recipe-testing:^2 --dev --no-update
+          fi
+          if [ "${{ matrix.phplinting }}" == "true" ]; then
+            composer require silverstripe/cow:dev-master --dev --no-update
+          fi
+          if [ "$INPUTS_COMPOSER_REQUIRE_EXTRA" != "" ]; then
+            # TODO: test that requiring multiple modules seperated with a space here works
+            composer require $INPUTS_COMPOSER_REQUIRE_EXTRA --no-update
+          fi
+          if [ "$MATRIX_COMPOSER_REQUIRE_EXTRA" != "" ]; then
+            # TODO: test that requiring multiple modules seperated with a space here works
+            composer require $MATRIX_COMPOSER_REQUIRE_EXTRA --no-update
+          fi
+
+          # Ensure composer.json has prefer-stable true and minimum-stability dev
+          php -r '$j=json_decode(file_get_contents("composer.json"));$j->{"prefer-stable"}=true;$j->{"minimum-stability"}="dev";file_put_contents("composer.json",json_encode($j,192));'
+
+          # Enable plugins
+          composer config allow-plugins.composer/installers true
+          composer config allow-plugins.silverstripe/recipe-plugin true
+          composer config allow-plugins.silverstripe/vendor-plugin true
+          
+          # Useful to see generated composer.json when diagnosing new bugs
+          cat composer.json
+
+          # Installing using --prefer-source for recipes + some modules that run other unit-tests in other modules
+          # matrix.composer_args is sometimes --prefer-lowest which is only supported by `composer update`, not `composer install`
+          # Modules do not have composer.lock files, so `composer update` is the same speed as `composer install`
+          composer update --prefer-source --no-interaction --no-progress ${{ matrix.composer_args }}
+
+          # Useful to see what was installed
+          composer show
+
+          # Remove vendor unit tests files that were installed because of the use of --prefer-source
+          # Some older silverstripe vendor modules may still have the phpunit5 setUp() signatures without :void which when loaded will throw fatal PHP errors.
+          # We cannot simply get rid of the 'tests' folders because behat requires vendor/silverstripe/[framework|cms]/tests/behat/serve-bootstrap.php
+          # Recipes are excluded because the unit tests they run are in the required modules, and there's an assumption they'll require a compatible minor branch of the module
+          if ! [[ "${{ github.repository }}" =~ /(recipe|silverstripe-installer) ]]; then
+            echo "Repositiory is a not a recipe, removing unecessary vendor silverstripe unit tests"
+            # Make an exception for 'ExtendTest.php' which is a misnamed TestOnly non-test class
+            php -r 'foreach (["silverstripe", "cwp", "symbiote", "dnadesign", "tractorcow", "bringyourownideas", "colymba"] as $v) { $d = "vendor/$v"; if (!is_dir($d)) continue; foreach (explode("\n", shell_exec("find $d | grep \/tests\/ | grep [a-zA-Z0-9]Test.php")) as $f) { if (preg_match("#ExtendTest\.php#", $f)) continue; if (is_file($f)) unlink($f); } }'
+            # Also remove a few other file that don't match the *Test.php convention and extends SapphireTest
+            if [ -f vendor/silverstripe/assets/tests/php/FilenameParsing/FileIDHelperTester.php ]; then
+              rm vendor/silverstripe/assets/tests/php/FilenameParsing/FileIDHelperTester.php
+            fi
+            if [ -f vendor/silverstripe/framework/tests/php/Forms/NullableFieldTests.php ]; then
+              rm vendor/silverstripe/framework/tests/php/Forms/NullableFieldTests.php
+            fi
+            if [ -f vendor/silverstripe/graphql/tests/Middleware/MiddlewareProcessTestBase.php ]; then
+              rm vendor/silverstripe/graphql/tests/Middleware/MiddlewareProcessTestBase.php
+            fi
+            # Rebuild composer classloader
+            composer dumpautoload -o
+          fi
+
+      - name: Final preparation
+        run: |
+          # Add .env file and create artifacts directory
+          if [[ "${{ matrix.db }}" =~ mysql ]]; then
+            if [ "${{ matrix.db }}" == "mysql57pdo" ]; then
+              cat << EOF > .env
+          SS_DATABASE_CLASS="MySQLPDODatabase"
+          SS_DATABASE_PORT="3357"
+          EOF
+            else
+              cat << EOF > .env
+          SS_DATABASE_CLASS="MySQLDatabase"
+          SS_DATABASE_PORT="${{ matrix.db == 'mysql57' && '3357' || '3380' }}"
+          EOF
+            fi
+            cat << EOF >> .env
+          SS_DATABASE_SERVER="127.0.0.1"
+          SS_DATABASE_USERNAME="root"
+          SS_DATABASE_PASSWORD="root"
+          EOF
+          else
+            cat << EOF > .env
+          SS_DATABASE_CLASS="PostgreSQLDatabase"
+          SS_DATABASE_SERVER="localhost"
+          SS_DATABASE_PORT="5432"
+          SS_DATABASE_USERNAME="postgres"
+          SS_DATABASE_PASSWORD="postgres"
+          EOF
+          fi
+          cat << EOF >> .env
+          SS_ENVIRONMENT_TYPE="dev"
+          SS_DATABASE_NAME="SS_mysite"
+          SS_DEFAULT_ADMIN_USERNAME="admin"
+          SS_DEFAULT_ADMIN_PASSWORD="password"
+          SS_TRUSTED_PROXY_IPS="*"
+          SS_MFA_SECRET_KEY="1234567894175b99966561e1efe237e4"
+          SS_BASE_URL="http://localhost"
+          EOF
+
+          # debug
+          echo ".env is"
+          cat .env
+
+          # Artifacts directory must be created after composer install as it would remove the artifacts directory
+          mkdir artifacts
+
+          # run dev/build flush to help debug any issues (though it's not strictly required here)
+          # travis-shared has no reference to sake, so it should be safe to omit dev/build flush=1
+          # normal module
+          if [ -f vendor/bin/sake ]; then
+            vendor/bin/sake dev/build flush=1
+          fi
+          # framework module
+          if [ -f sake ]; then
+            ./sake dev/build flush=1
+          fi
+
+          # Delete the silverstripe-cache dir - it will automatically recreate when needed
+          # There were issues with a unit test getting the following issue
+          # Identifier name 'SilverStripe_CampaignAdmin_Tests_AddToCampaignValidatorTest_TestObject' is too long
+          # Likely because the /tmp/silverstripe-cache-php7.4.xyz... dir being out of sync with TestOnly objects
+          rm -rf $(find /tmp -maxdepth 1 | grep silverstripe-cache)
+
+      - name: Debug
+        run: |
+          echo "matrix.phpunit: ${{ matrix.phpunit }}"
+
+      - name: Run tests
+        uses: emteknetnz/gha-run-tests@main
+        with:
+          phpunit: ${{ matrix.phpunit }}
+          phpunit_suite: ${{ matrix.phpunit_suite }}
+          endtoend: ${{ matrix.endtoend }}
+          endtoend_suite: ${{ matrix.endtoend_suite }}
+          endtoend_config: ${{ matrix.endtoend_config }}
+          js: ${{ matrix.js }}
+          phplinting: ${{ matrix.phplinting }}
+          phpcoverage: ${{ matrix.phpcoverage }}
+
+      - name: Copy artifacts
+        if: always()
+        run: |
+          # Copy selected files to the artifacts dir
+          if [ -f composer.json ]; then
+            cp composer.json artifacts
+          fi
+          if [ -f composer.lock ]; then
+            cp composer.lock artifacts
+          fi
+          if [ "${{ matrix.endtoend }}" == "true" ] && [ -f __behat.yml ]; then
+            cp __behat.yml artifacts
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@82c141cc518b40d92cc801eee768e7aafc9c2fa2 # @v2
+        if: always()
+        with:
+          name: ${{ env.artifacts_name }}
+          path: artifacts
