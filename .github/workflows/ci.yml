@@ -74,7 +74,7 @@ jobs:
     steps:
       - name: Generate matrix
         id: generate-matrix
-        uses: emteknetnz/gha-generate-matrix@main
+        uses: silverstripe/gha-generate-matrix@main
         with:
           extra_jobs: ${{ inputs.extra_jobs }}
           simple_matrix: ${{ inputs.simple_matrix }}
@@ -205,7 +205,8 @@ jobs:
           <IfModule mod_dir.c>
             DirectoryIndex index.php index.html index.cgi index.pl index.xhtml index.htm
           </IfModule>
-          EOF)
+          EOF
+          )
           sudo echo "$DIR_CONF" > /etc/apache2/mods-enabled/dir.conf
           # create a 000-default.conf file with the pwd as the DocumentRoot
           DEFAULT_CONF=$(cat << EOF
@@ -219,7 +220,8 @@ jobs:
             ErrorLog ${APACHE_LOG_DIR}/error.log
             CustomLog ${APACHE_LOG_DIR}/access.log combined
           </VirtualHost>
-          EOF)
+          EOF
+          )
           sudo echo "$DEFAULT_CONF" > /etc/apache2/sites-enabled/000-default.conf
           sudo a2enmod rewrite
           # run apache as 'runner:docker' instead of 'www-data:www-data'
@@ -464,7 +466,7 @@ jobs:
           echo "matrix.phpunit: ${{ matrix.phpunit }}"
 
       - name: Run tests
-        uses: emteknetnz/gha-run-tests@main
+        uses: silverstripe/gha-run-tests@main
         with:
           phpunit: ${{ matrix.phpunit }}
           phpunit_suite: ${{ matrix.phpunit_suite }}
