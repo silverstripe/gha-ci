@@ -74,7 +74,7 @@ jobs:
     steps:
       - name: Generate matrix
         id: generate-matrix
-        uses: silverstripe/gha-generate-matrix@main
+        uses: silverstripe/gha-generate-matrix@v1
         with:
           extra_jobs: ${{ inputs.extra_jobs }}
           simple_matrix: ${{ inputs.simple_matrix }}
@@ -468,7 +468,7 @@ jobs:
           echo "matrix.phpunit: ${{ matrix.phpunit }}"
 
       - name: Run tests
-        uses: silverstripe/gha-run-tests@main
+        uses: silverstripe/gha-run-tests@v1
         with:
           phpunit: ${{ matrix.phpunit }}
           phpunit_suite: ${{ matrix.phpunit_suite }}

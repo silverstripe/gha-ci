@@ -23,7 +23,7 @@ on:
 
 jobs:
   ci:
-    uses: silverstripe/gha-ci/.github/workflows/ci.yml@main
+    uses: silverstripe/gha-ci/.github/workflows/ci.yml@v1
 ```
 
 Set config specific to your needs via "inputs" defined under the `with:` key. For instance, to disable PHP linting because your module does not yet have a `phpcs.xml.dist` file
@@ -31,7 +31,7 @@ Set config specific to your needs via "inputs" defined under the `with:` key. Fo
 ```yml
 jobs:
   ci:
-    uses: silverstripe/gha-ci/.github/workflows/ci.yml@main
+    uses: silverstripe/gha-ci/.github/workflows/ci.yml@v1
     with:
       phplinting: false
 ```
