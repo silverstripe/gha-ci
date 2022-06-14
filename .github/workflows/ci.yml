@@ -201,15 +201,17 @@ jobs:
         run: |
           # apache2 is installed and running by default in ubuntu
           # update dir.conf to use index.php as the primary index doc
-          DIR_CONF=$(cat << EOF
+          # using an intermediate file instead of variable to prevent the following issue:
+          # echo "$DIR_CONF" > /etc/apache2/mods-enabled/dir.conf: Permission denied
+          cat << EOF > __dir.conf
           <IfModule mod_dir.c>
             DirectoryIndex index.php index.html index.cgi index.pl index.xhtml index.htm
           </IfModule>
           EOF
-          )
-          sudo echo "$DIR_CONF" > /etc/apache2/mods-enabled/dir.conf
+          sudo cp __dir.conf /etc/apache2/mods-enabled/dir.conf
+          rm __dir.conf
           # create a 000-default.conf file with the pwd as the DocumentRoot
-          DEFAULT_CONF=$(cat << EOF
+          cat << EOF > __000-default.conf
           <VirtualHost *:80>
             ServerAdmin webmaster@localhost
             DocumentRoot $(pwd)
@@ -221,8 +223,8 @@ jobs:
             CustomLog ${APACHE_LOG_DIR}/access.log combined
           </VirtualHost>
           EOF
-          )
-          sudo echo "$DEFAULT_CONF" > /etc/apache2/sites-enabled/000-default.conf
+          sudo cp __000-default.conf /etc/apache2/sites-enabled/000-default.conf
+          rm __000-default.conf
           sudo a2enmod rewrite
           # run apache as 'runner:docker' instead of 'www-data:www-data'
           sudo sh -c "echo 'export APACHE_RUN_USER=runner' >> /etc/apache2/envvars"
