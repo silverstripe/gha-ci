@@ -59,8 +59,12 @@ Runs phpcs and phpstan if the `phpcs.xml.dist` or `phpstan.neon.dist` config fil
 `phplinting: false`
 
 ##### PHP coverage
-Run codecov, which does not require a configuration file. Default is false, though modules on the silverstripe account will always have this enabled. Enable with:
+Run codecov, which does not require a configuration file. Default is false, though for CI runs on the silverstripe account this option will be ignored and codecov is set to run in [gha-generate-matrix](https://github.com/silvestripe/gha-matrix). Enable with:
 `phpcoverage: true`
+
+##### PHP coverage force off
+Force codecov off for CI runs on the silverstripe account. Default is false. Enable with:
+`phpcoverage_force_off: true`
 
 ##### End-to-end tests
 Runs behat tests if `behat.yml` is available. Default is true, disable with:

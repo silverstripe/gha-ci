@@ -60,7 +60,8 @@ jobs:
           # github.ref_name - The branch or tag name that triggered the workflow run - same as github.ref though without the leading refs/[heads|tags]/
           echo "github.ref_name: $GITHUB_REF_NAME"
           # gitbub.repository - The owner and repository name. For example, Codertocat/Hello-World
-          echo "$github.repository: $GITHUB_REPOSITORY"
+          # On forked repos, this will show <account_of_fork>/<repo>
+          echo "github.repository: $GITHUB_REPOSITORY"
 
   # Generates a dynamic matrix of jobs to run tests on based on the inputs provided
   genmatrix:
