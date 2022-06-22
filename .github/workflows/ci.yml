@@ -23,6 +23,9 @@ on:
       phpcoverage:
         type: boolean
         default: false
+      phpcoverage_force_off:
+        type: boolean
+        default: false
       phplinting:
         type: boolean
         default: true
@@ -81,6 +84,7 @@ jobs:
           simple_matrix: ${{ inputs.simple_matrix }}
           endtoend: ${{ inputs.endtoend }}
           phpcoverage: ${{ inputs.phpcoverage }}
+          phpcoverage_force_off: ${{ inputs.phpcoverage_force_off }}
           phplinting: ${{ inputs.phplinting }}
           phpunit: ${{ inputs.phpunit }}
           js: ${{ inputs.js }}
