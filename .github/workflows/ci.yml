@@ -318,9 +318,12 @@ jobs:
             composer require $MATRIX_COMPOSER_REQUIRE_EXTRA --no-update
           fi
 
-          # Ensure composer.json has prefer-stable true and minimum-stability dev
-          # Update preferred-install to source for recipes and some modules that run
-          # other unit-tests in other modules
+          # a) Ensure composer.json has prefer-stable true and minimum-stability dev
+          # b) Update preferred-install to source for recipes and some modules that run
+          #    other unit-tests in other modules
+          # c) Prevent installation of silverstripe/vendor-plugin < 1.5.2 which contains a bugfix
+          #    which is required for --prefer-lowest to install
+          #    https://github.com/silverstripe/vendor-plugin/pull/49
           php -r '
             $j = json_decode(file_get_contents("composer.json"));
             $j->{"prefer-stable"} = true;
@@ -338,6 +341,10 @@ jobs:
             $j->config->{"preferred-install"}->{"cwp/*"} = "source";
             $j->config->{"preferred-install"}->{"tractorcow/*"} = "source";
             $j->config->{"preferred-install"}->{"*"} = "dist";
+            if (empty($j->conflict)) {
+              $j->conflict = new stdClass();
+            }
+            $j->conflict->{"silverstripe/vendor-plugin"} = "<1.5.2";
             file_put_contents("composer.json", json_encode($j, JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES));
           '
 
