@@ -263,12 +263,25 @@ jobs:
           if [[ $GITHUB_BASE_REF != "" ]]; then
             BRANCH_OR_TAG=$GITHUB_BASE_REF
           fi
-          if [[ $BRANCH_OR_TAG =~ ^[1-9]$ ]] || [[ $BRANCH_OR_TAG =~ ^[0-9]\.[0-9]+$ ]]; then
-            export COMPOSER_ROOT_VERSION="${BRANCH_OR_TAG}.x-dev"
+          # This extracts the version from common branch naming conventions
+          # pulls/x/mybranch style is used on push events to creative-commoners account
+          # 4 => 4
+          # 4.10 => 4.10
+          # pulls/4/mybranch => 4
+          # pulls/4.10/mybranch => 4.10
+          if [[ $BRANCH_OR_TAG =~ ^([1-9]+)$ ]] || \
+             [[ $BRANCH_OR_TAG =~ ^([0-9]+\.[0-9]+)$ ]] || \
+             [[ $BRANCH_OR_TAG =~ ^pulls/([1-9]+)/.+$ ]] || \
+             [[ $BRANCH_OR_TAG =~ ^pulls/([0-9]+\.[0-9]+)/.+$ ]]; \
+          then
+            export COMPOSER_ROOT_VERSION="${BASH_REMATCH[1]}.x-dev"
           elif [[ $BRANCH_OR_TAG =~ ^[0-9]\.[0-9]+\.[0-9]+ ]]; then
             export COMPOSER_ROOT_VERSION="${BRANCH_OR_TAG}"
           else
-            export COMPOSER_ROOT_VERSION="dev-${BRANCH_OR_TAG}"
+            # e.g. push event to branch called myaccount-patch-1
+            # use git history to make a best attempt at getting the parent branch
+            PARENT_BRANCH=$(git show-branch -a 2>/dev/null | grep '\*' | grep -v `git rev-parse --abbrev-ref HEAD` | head -n1 | sed 's/.*\[\(.*\)\].*/\1/' | sed 's/[\^~].*//')
+            export COMPOSER_ROOT_VERSION="${PARENT_BRANCH}.x-dev"
           fi
           echo "BRANCH_OR_TAG is $BRANCH_OR_TAG"
           echo "COMPOSER_ROOT_VERSION is $COMPOSER_ROOT_VERSION"
