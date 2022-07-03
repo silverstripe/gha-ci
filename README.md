@@ -23,14 +23,36 @@ on:
 
 jobs:
   ci:
+    name: CI
     uses: silverstripe/gha-ci/.github/workflows/ci.yml@v1
 ```
+
+#### Running on a regular schedule
+
+```yml
+on:
+  # Run once per week
+  schedule:
+  - cron: '0 0 * * 1'
+
+jobs:
+  ci:
+    name: CI
+    # Only run the cron on the account hosting this repository, not on the accounts of forks
+    # github.repository take the form of AccountName/repository-name
+    # Change '<account_name>/' to match the name of the account hosting this repository
+    if: (github.event_name == 'schedule' && startsWith(github.repository, '<account_name>/')) || (github.event_name != 'schedule')
+    uses: silverstripe/gha-ci/.github/workflows/ci.yml@v1
+```
+
+#### Job configuration
 
 Set config specific to your needs via "inputs" defined under the `with:` key. For instance, to disable PHP linting because your module does not yet have a `phpcs.xml.dist` file
 
 ```yml
 jobs:
   ci:
+    name: CI
     uses: silverstripe/gha-ci/.github/workflows/ci.yml@v1
     with:
       phplinting: false
