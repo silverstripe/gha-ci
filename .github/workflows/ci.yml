@@ -280,8 +280,18 @@ jobs:
           else
             # e.g. push event to branch called myaccount-patch-1
             # use git history to make a best attempt at getting the parent branch
-            PARENT_BRANCH=$(git show-branch -a 2>/dev/null | grep '\*' | grep -v `git rev-parse --abbrev-ref HEAD` | head -n1 | sed 's/.*\[\(.*\)\].*/\1/' | sed 's/[\^~].*//')
-            export COMPOSER_ROOT_VERSION="${PARENT_BRANCH}.x-dev"
+            # note: { grep * || :; } is to prevent exit code of 1 on zero-match from halting workflow
+            CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+            PARENT_BRANCH=$(git show-branch -a 2>/dev/null | { grep '\*' || :; } | { grep -v $CURRENT_BRANCH || :; } | head -n1 | sed 's/.*\[\(.*\)\].*/\1/' | sed 's/[\^~].*//')
+            if [[ $PARENT_BRANCH != "" ]]; then
+              if [[ $PARENT_BRANCH =~ ^([1-9]+)$ ]] || [[ $PARENT_BRANCH =~ ^([0-9]+\.[0-9]+)$ ]]; then
+                export COMPOSER_ROOT_VERSION="${PARENT_BRANCH}.x-dev"
+              else
+                export COMPOSER_ROOT_VERSION="dev-${PARENT_BRANCH}"
+              fi
+            else
+              export COMPOSER_ROOT_VERSION="dev-${CURRENT_BRANCH}"
+            fi
           fi
           echo "BRANCH_OR_TAG is $BRANCH_OR_TAG"
           echo "COMPOSER_ROOT_VERSION is $COMPOSER_ROOT_VERSION"
