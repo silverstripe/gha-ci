@@ -326,7 +326,8 @@ jobs:
             composer require silverstripe/recipe-testing:^2 --dev --no-update
           fi
           if [[ "${{ matrix.phplinting }}" == "true" ]]; then
-            composer require silverstripe/cow:dev-master --dev --no-update
+            # cow ~2.0 support guzzle 6 so is installable on older branches, dev-master supports guzzle 7
+            composer require "silverstripe/cow:~2.0 || dev-master" --dev --no-update
           fi
 
           # Require silverstripe/installer for non-recipes and all but a few modules
@@ -437,7 +438,7 @@ jobs:
                 fi
               fi
             done
-            if [[ SUCCESSFULLY_REQUIRED == 'false' ]]; then
+            if [[ $SUCCESSFULLY_REQUIRED == 'false' ]]; then
               cat composer.json
               cat __require_attempt.txt
               exit 2
