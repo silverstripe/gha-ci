@@ -140,42 +140,8 @@ jobs:
 
     steps:
 
-      - name: Set fetch depth
-        id: set-fetch-depth
-        env:
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        shell: bash
-        run: |
-          # Default fetch-depth of 1 will only fetch the latest commit
-          # This is fine for non-pull-request events where standard major.minor naming conventions
-          # are used so we do not need to attempt to get the name of the parent branch
-          FETCH_DEPTH=1
-          # For pull-requests, set fetch-depth to one more than the number of commits
-          # so we can later make a best attempt at getting the name of the parent branch
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            PR_NUMBER=${{ github.event.pull_request.number }}
-            # https://docs.github.com/en/rest/pulls/pulls#list-commits-on-a-pull-request
-            RESP_CODE=$(curl -w %{http_code} -s -o __pr_commits.json \
-            -X GET https://api.github.com/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/commits \
-            -H "Accept: application/vnd.github.v3+json" \
-            -H "Authorization: token ${{ github.token }}" \
-            )
-            if [[ $RESP_CODE == "200" ]]; then
-              NUM_COMMITS=$(cat __pr_commits.json | jq '. | length')
-              FETCH_DEPTH=$(( NUM_COMMITS + 1 ))
-              rm __pr_commits.json
-            else
-              echo "Failed to fetch commits for pull-request - HTTP response code was $RESP_CODE"
-              exit 1
-            fi
-          fi
-          echo "FETCH_DEPTH is $FETCH_DEPTH"
-          echo "::set-output name=fetch-depth::$FETCH_DEPTH"
-
       - name: Checkout code
         uses: actions/checkout@7884fcad6b5d53d10323aee724dc68d8b9096a2e # v2.4.2
-        with:
-          fetch-depth: ${{ steps.set-fetch-depth.outputs.fetch-depth }}
 
       - name: Install PHP
         # SHA will need to be updated to support new php version when they are released
@@ -288,6 +254,7 @@ jobs:
         env:
           INPUTS_COMPOSER_REQUIRE_EXTRA: ${{ inputs.composer_require_extra }}
           MATRIX_COMPOSER_REQUIRE_EXTRA: ${{ matrix.composer_require_extra }}
+          PARENT_BRANCH: ${{ matrix.parent_branch }}
           # https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
           # github.base_ref is only available on pull-requests events is the target branch - is is NOT prefixed with refs/heads/
           GITHUB_BASE_REF: ${{ github.base_ref }}
@@ -316,10 +283,7 @@ jobs:
             export COMPOSER_ROOT_VERSION="${BRANCH_OR_TAG}"
           else
             # e.g. push event to branch called myaccount-patch-1
-            # use git history to make a best attempt at getting the parent branch
-            # note: { grep * || :; } is to prevent exit code of 1 on zero-match from halting workflow
             CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-            PARENT_BRANCH=$(git show-branch -a 2>/dev/null | { grep '\*' || :; } | { grep -v $CURRENT_BRANCH || :; } | head -n1 | sed 's/.*\[\(.*\)\].*/\1/' | sed 's/[\^~].*//')
             if [[ $PARENT_BRANCH != "" ]]; then
               if [[ $PARENT_BRANCH =~ ^([1-9]+)$ ]] || [[ $PARENT_BRANCH =~ ^([0-9]+\.[0-9]+)$ ]]; then
                 export COMPOSER_ROOT_VERSION="${PARENT_BRANCH}.x-dev"
