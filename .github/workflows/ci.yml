@@ -317,13 +317,13 @@ jobs:
           # 1.6.10 is for --prefer-lowest and is the minimum version with php 8.1 support
           composer require mikey179/vfsstream:^1.6.10 --dev --no-update
 
-          if [[ "${{ matrix.db }}" == "pgsql" ]] && ! [[ $GITHUB_REPOSITORY =~ /silverstripe-postgresql ]]; then
+          if [[ "${{ matrix.db }}" == "pgsql" ]] && ! [[ $GITHUB_REPOSITORY =~ /silverstripe-postgresql$ ]]; then
             composer require silverstripe/postgresql:^2 --no-update
           fi
-          if [[ "${{ matrix.endtoend }}" == "true" ]]; then
+          if [[ "${{ matrix.endtoend }}" == "true" ]] && ! [[ $GITHUB_REPOSITORY =~ /recipe-testing$ ]]; then
             composer require silverstripe/recipe-testing:^2 --dev --no-update
           fi
-          if [[ "${{ matrix.phplinting }}" == "true" ]]; then
+          if [[ "${{ matrix.phplinting }}" == "true" ]] && ! [[ $GITHUB_REPOSITORY =~ /cow$ ]]; then
             # cow ~2.0 support guzzle 6 so is installable on older branches, dev-master supports guzzle 7
             composer require "silverstripe/cow:~2.0 || dev-master" --dev --no-update
           fi
