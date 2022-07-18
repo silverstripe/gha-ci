@@ -351,6 +351,7 @@ jobs:
           # c) Prevent installation of silverstripe/vendor-plugin < 1.5.2 which contains a bugfix
           #    which is required for --prefer-lowest to install
           #    https://github.com/silverstripe/vendor-plugin/pull/49
+          # d) Set version of PHP to make it easier to copy paste composer.json to local dev environment
           php -r '
             $j = json_decode(file_get_contents("composer.json"));
             $j->{"prefer-stable"} = true;
@@ -358,7 +359,9 @@ jobs:
             if (empty($j->config)) {
               $j->config = new stdClass();
             }
-            $j->config->{"preferred-install"} = new stdClass();
+            if (empty($j->config->{"preferred-install"})) {
+              $j->config->{"preferred-install"} = new stdClass();
+            }
             $j->config->{"preferred-install"}->{"silverstripe/*"} = "source";
             $j->config->{"preferred-install"}->{"creative-commoners/*"} = "source";
             $j->config->{"preferred-install"}->{"symbiote/*"} = "source";
@@ -372,6 +375,10 @@ jobs:
               $j->conflict = new stdClass();
             }
             $j->conflict->{"silverstripe/vendor-plugin"} = "<1.5.2";
+            if (empty($j->config->platform)) {
+              $j->config->platform = new stdClass();
+            }
+            $j->config->platform->php = "${{ matrix.php }}";
             file_put_contents("composer.json", json_encode($j, JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES));
           '
 
