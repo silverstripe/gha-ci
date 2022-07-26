@@ -182,7 +182,7 @@ jobs:
 
           # Disable xdebug which greatly slow down unit testing
           # Note: omitting xdebug from shivammathur/setup-php still results in xdebug being installed and enabled
-          if [[ "${{ matrix.phpcoverage }}" == "true" ]]; then
+          if [[ "${{ matrix.phpcoverage }}" != "true" ]]; then
             sudo sh -c "echo ';zend_extension=xdebug.so' > /etc/php/${{ matrix.php }}/mods-available/xdebug.ini"
           fi
           echo "PHP has been configured"
@@ -317,13 +317,13 @@ jobs:
           # 1.6.10 is for --prefer-lowest and is the minimum version with php 8.1 support
           composer require mikey179/vfsstream:^1.6.10 --dev --no-update
 
-          if [[ "${{ matrix.db }}" == "pgsql" ]] && ! [[ $GITHUB_REPOSITORY =~ /silverstripe-postgresql ]]; then
+          if [[ "${{ matrix.db }}" == "pgsql" ]] && ! [[ $GITHUB_REPOSITORY =~ /silverstripe-postgresql$ ]]; then
             composer require silverstripe/postgresql:^2 --no-update
           fi
-          if [[ "${{ matrix.endtoend }}" == "true" ]]; then
+          if [[ "${{ matrix.endtoend }}" == "true" ]] && ! [[ $GITHUB_REPOSITORY =~ /recipe-testing$ ]]; then
             composer require silverstripe/recipe-testing:^2 --dev --no-update
           fi
-          if [[ "${{ matrix.phplinting }}" == "true" ]]; then
+          if [[ "${{ matrix.phplinting }}" == "true" ]] && ! [[ $GITHUB_REPOSITORY =~ /cow$ ]]; then
             # cow ~2.0 support guzzle 6 so is installable on older branches, dev-master supports guzzle 7
             composer require "silverstripe/cow:~2.0 || dev-master" --dev --no-update
           fi
@@ -351,6 +351,7 @@ jobs:
           # c) Prevent installation of silverstripe/vendor-plugin < 1.5.2 which contains a bugfix
           #    which is required for --prefer-lowest to install
           #    https://github.com/silverstripe/vendor-plugin/pull/49
+          # d) Set version of PHP to make it easier to copy paste composer.json to local dev environment
           php -r '
             $j = json_decode(file_get_contents("composer.json"));
             $j->{"prefer-stable"} = true;
@@ -358,7 +359,9 @@ jobs:
             if (empty($j->config)) {
               $j->config = new stdClass();
             }
-            $j->config->{"preferred-install"} = new stdClass();
+            if (empty($j->config->{"preferred-install"})) {
+              $j->config->{"preferred-install"} = new stdClass();
+            }
             $j->config->{"preferred-install"}->{"silverstripe/*"} = "source";
             $j->config->{"preferred-install"}->{"creative-commoners/*"} = "source";
             $j->config->{"preferred-install"}->{"symbiote/*"} = "source";
@@ -372,6 +375,10 @@ jobs:
               $j->conflict = new stdClass();
             }
             $j->conflict->{"silverstripe/vendor-plugin"} = "<1.5.2";
+            if (empty($j->config->platform)) {
+              $j->config->platform = new stdClass();
+            }
+            $j->config->platform->php = "${{ matrix.php }}";
             file_put_contents("composer.json", json_encode($j, JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES));
           '
 
