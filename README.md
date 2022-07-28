@@ -39,9 +39,8 @@ jobs:
   ci:
     name: CI
     # Only run the cron on the account hosting this repository, not on the accounts of forks
-    # github.repository take the form of AccountName/repository-name
-    # Change '<account_name>/' to match the name of the account hosting this repository
-    if: (github.event_name == 'schedule' && startsWith(github.repository, '<account_name>/')) || (github.event_name != 'schedule')
+    # Change '<account_name>' to match the name of the account hosting this repository
+    if: (github.event_name == 'schedule' && github.repository_owner == '<account_name>') || (github.event_name != 'schedule')
     uses: silverstripe/gha-ci/.github/workflows/ci.yml@v1
 ```
 
