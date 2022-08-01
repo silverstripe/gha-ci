@@ -84,6 +84,7 @@ jobs:
         uses: silverstripe/gha-generate-matrix@v1
         with:
           extra_jobs: ${{ inputs.extra_jobs }}
+          dynamic_matrix: ${{ inputs.dynamic_matrix }}
           simple_matrix: ${{ inputs.simple_matrix }}
           endtoend: ${{ inputs.endtoend }}
           phpcoverage: ${{ inputs.phpcoverage }}
