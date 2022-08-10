@@ -303,7 +303,7 @@ jobs:
             $j = json_decode(file_get_contents("composer.json"));
             $pu = $j->{"require-dev"}->{"phpunit/phpunit"} ?? "";
             $rt = $j->{"require-dev"}->{"silverstripe/recipe-testing"} ?? "";
-            if ($pu == "^9" || $pu == "^9.5" || $rt == "^2") {
+            if ($pu == "^9" || $pu == "^9.5" || $rt == "^2" || $rt == "^3") {
               if (!property_exists($j, "replace")) {
                 $j->replace = new stdClass();
               }
