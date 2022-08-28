@@ -303,7 +303,7 @@ jobs:
             $j = json_decode(file_get_contents("composer.json"));
             $pu = $j->{"require-dev"}->{"phpunit/phpunit"} ?? "";
             $rt = $j->{"require-dev"}->{"silverstripe/recipe-testing"} ?? "";
-            if ($pu == "^9" || $pu == "^9.5" || $rt == "^2") {
+            if ($pu == "^9" || $pu == "^9.5" || $rt == "^2" || $rt == "^3") {
               if (!property_exists($j, "replace")) {
                 $j->replace = new stdClass();
               }
@@ -319,10 +319,10 @@ jobs:
           composer require mikey179/vfsstream:^1.6.10 --dev --no-update
 
           if [[ "${{ matrix.db }}" == "pgsql" ]] && ! [[ $GITHUB_REPOSITORY =~ /silverstripe-postgresql$ ]]; then
-            composer require silverstripe/postgresql:^2 --no-update
+            composer require "silverstripe/postgresql:^2 || ^3" --no-update
           fi
           if [[ "${{ matrix.endtoend }}" == "true" ]] && ! [[ $GITHUB_REPOSITORY =~ /recipe-testing$ ]]; then
-            composer require silverstripe/recipe-testing:^2 --dev --no-update
+            composer require "silverstripe/recipe-testing:^2 || ^3" --dev --no-update
           fi
           if [[ "${{ matrix.phplinting }}" == "true" ]] && [[ -f .cow.json ]] && ! [[ $GITHUB_REPOSITORY =~ /cow$ ]]; then
             # cow ~2.0 support guzzle 6 so is installable on older branches, dev-master supports guzzle 7
