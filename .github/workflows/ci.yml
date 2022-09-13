@@ -556,7 +556,7 @@ jobs:
           cat << EOF >> app/_config/my-logger.yml
           ---
           Name: error-logging
-          After: *
+          After: '*'
           ---
           SilverStripe\Core\Injector\Injector:
             Psr\Log\LoggerInterface.errorhandler:
