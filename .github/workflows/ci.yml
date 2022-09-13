@@ -228,6 +228,7 @@ jobs:
               AllowOverride All
               Require all granted
             </Directory>
+            LogLevel notice
             ErrorLog ${APACHE_LOG_DIR}/error.log
             CustomLog ${APACHE_LOG_DIR}/access.log combined
           </VirtualHost>
@@ -551,6 +552,23 @@ jobs:
           echo ".env is"
           cat .env
 
+          # silverstripe logging
+          cat << EOF >> app/_config/my-logger.yml
+          ---
+          Name: error-logging
+          After: *
+          ---
+          SilverStripe\Core\Injector\Injector:
+            Psr\Log\LoggerInterface.errorhandler:
+              calls:
+                LogFileHandler: [ pushHandler, [ '%\$LogFileHandler' ] ]
+            LogFileHandler:
+              class: Monolog\Handler\StreamHandler
+              constructor:
+                - "$(pwd)/silverstripe.log"
+                - "notice"
+          EOF
+
           # Artifacts directory must be created after composer install as it would remove the artifacts directory
           # This seems a bit strange, if you need to add an artifact at an earlier stage then revalidate that
           # composer install does actually remove the artifact directory
@@ -601,6 +619,15 @@ jobs:
           fi
           if [[ "${{ matrix.endtoend }}" == "true" ]] && [[ -f __behat.yml ]]; then
             cp __behat.yml artifacts
+          fi
+          if [[ -f ${APACHE_LOG_DIR}/error.log ]]; then
+            cp ${APACHE_LOG_DIR}/error.log artifacts
+          fi
+          if [[ -f ${APACHE_LOG_DIR}/access.log ]]; then
+            cp ${APACHE_LOG_DIR}/access.log artifacts
+          fi
+          if [[ -f $(pwd)/silverstripe.log ]]; then
+            cp $(pwd)/silverstripe.log artifacts
           fi
 
       # https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts
