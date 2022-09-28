@@ -555,7 +555,8 @@ jobs:
           cat .env
 
           # silverstripe logging
-          cat << EOF >> app/_config/my-logger.yml
+          if [[ -d "./app/_config/" ]]; then
+            cat << EOF >> app/_config/my-logger.yml
           ---
           Name: error-logging
           After: '*'
@@ -570,6 +571,7 @@ jobs:
                 - "$GITHUB_WORKSPACE/silverstripe.log"
                 - "notice"
           EOF
+          fi
 
           # Artifacts directory must be created after composer install as it would remove the artifacts directory
           # This seems a bit strange, if you need to add an artifact at an earlier stage then revalidate that
