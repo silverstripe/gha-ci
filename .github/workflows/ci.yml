@@ -508,6 +508,8 @@ jobs:
           fi
 
       - name: Final preparation
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
         run: |
           # Add .env file and create artifacts directory
           # Note: the wonky indentation is intentional so there is no space at the start of
@@ -553,7 +555,8 @@ jobs:
           cat .env
 
           # silverstripe logging
-          cat << EOF >> app/_config/my-logger.yml
+          if [[ -d "./app/_config/" ]]; then
+            cat << EOF >> app/_config/my-logger.yml
           ---
           Name: error-logging
           After: '*'
@@ -565,9 +568,10 @@ jobs:
             LogFileHandler:
               class: Monolog\Handler\StreamHandler
               constructor:
-                - "$(pwd)/silverstripe.log"
+                - "$GITHUB_WORKSPACE/silverstripe.log"
                 - "notice"
           EOF
+          fi
 
           # Artifacts directory must be created after composer install as it would remove the artifacts directory
           # This seems a bit strange, if you need to add an artifact at an earlier stage then revalidate that
@@ -609,6 +613,8 @@ jobs:
 
       - name: Copy artifacts
         if: always()
+        env:
+          GITHUB_WORKSPACE: ${{ github.workspace }}
         run: |
           # Copy selected files to the artifacts dir
           if [[ -f composer.json ]]; then
@@ -626,8 +632,8 @@ jobs:
           if [[ -f ${APACHE_LOG_DIR}/access.log ]]; then
             cp ${APACHE_LOG_DIR}/access.log artifacts
           fi
-          if [[ -f $(pwd)/silverstripe.log ]]; then
-            cp $(pwd)/silverstripe.log artifacts
+          if [[ -f $GITHUB_WORKSPACE/silverstripe.log ]]; then
+            cp $GITHUB_WORKSPACE/silverstripe.log artifacts
           fi
 
       # https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts
