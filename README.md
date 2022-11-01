@@ -63,6 +63,10 @@ jobs:
 Require additional modules through composer for matrix entries. You do not need to quote the string for multiple requirements
 `composer_require_extra: silverstripe/widgets:^2 silverstripe/comments:^3`
 
+##### Composer install
+Use `composer install` rather than default `composer update`. A composer.lock file must be present. Intended only for testing branches of `silverstripe/installer` or `silverstripe/recipe-kitchen-sink` where multiple pull-requests need to be tested together. If `true` will cause `composer_require_extra` input to be ignored. If `dynamic_matrix` input also is `true` then jobs will only be created for the PHP version defined in `config.platform.php` in composer.json (recommended), or the lowest supported PHP version. There will also be no `--prefer-lowest` jobs created. Default is false, enable with:
+`composer_install: true`
+
 ##### Simple matrix
 Create a smaller matrix with only the lowest supported PHP and MySQL versions instead of a full matrix of multiple PHP and database versions. Default is false, enable with:
 `simple_matrix: true`

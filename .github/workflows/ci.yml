@@ -11,6 +11,10 @@ on:
         type: string
         required: false
         default: ''
+      composer_install:
+        type: boolean
+        required: false
+        default: false
       dynamic_matrix:
         type: boolean
         default: true
@@ -83,6 +87,7 @@ jobs:
         id: generate-matrix
         uses: silverstripe/gha-generate-matrix@v1
         with:
+          composer_install: ${{ inputs.composer_install }}
           extra_jobs: ${{ inputs.extra_jobs }}
           dynamic_matrix: ${{ inputs.dynamic_matrix }}
           simple_matrix: ${{ inputs.simple_matrix }}
@@ -299,61 +304,9 @@ jobs:
           echo "BRANCH_OR_TAG is $BRANCH_OR_TAG"
           echo "COMPOSER_ROOT_VERSION is $COMPOSER_ROOT_VERSION"
 
-          # If using phpunit9, ensure sminnee phpunit5 modules do not get installed
-          php -r '
-            $j = json_decode(file_get_contents("composer.json"));
-            $pu = $j->{"require-dev"}->{"phpunit/phpunit"} ?? "";
-            $rt = $j->{"require-dev"}->{"silverstripe/recipe-testing"} ?? "";
-            if ($pu == "^9" || $pu == "^9.5" || $rt == "^2" || $rt == "^3") {
-              if (!property_exists($j, "replace")) {
-                $j->replace = new stdClass();
-              }
-              $j->replace->{"sminnee/phpunit"} = "*";
-              $j->replace->{"sminnee/phpunit-mock-objects"} = "*";
-              file_put_contents("composer.json", json_encode($j, JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES));
-            }
-          '
-
-          # Required for any module/recipe that runs silverstripe/assets unit tests
-          # Should technically be defined as composer_require_extra on individual modules, though easier just doing here
-          # 1.6.10 is for --prefer-lowest and is the minimum version with php 8.1 support
-          composer require mikey179/vfsstream:^1.6.10 --dev --no-update
-
-          if [[ "${{ matrix.db }}" == "pgsql" ]] && ! [[ $GITHUB_REPOSITORY =~ /silverstripe-postgresql$ ]]; then
-            composer require "silverstripe/postgresql:^2 || ^3" --no-update
-          fi
-          if [[ "${{ matrix.endtoend }}" == "true" ]] && ! [[ $GITHUB_REPOSITORY =~ /recipe-testing$ ]]; then
-            composer require "silverstripe/recipe-testing:^2 || ^3" --dev --no-update
-          fi
-          if [[ "${{ matrix.phplinting }}" == "true" ]] && [[ -f .cow.json ]] && ! [[ $GITHUB_REPOSITORY =~ /cow$ ]]; then
-            # cow ~2.0 support guzzle 6 so is installable on older branches, dev-master supports guzzle 7
-            composer require "silverstripe/cow:~2.0 || dev-master" --dev --no-update
-          fi
-
-          # Require silverstripe/installer for non-recipes and all but a few modules
-          # Note: this block needs to be above COMPOSER_REQUIRE_EXTRA to allow that to override what is set here
-          if [[ "${{ matrix.installer_version }}" != "" ]]; then
-            composer require silverstripe/installer:${{ matrix.installer_version }} --no-update
-          fi
-
-          if [[ $INPUTS_COMPOSER_REQUIRE_EXTRA != "" ]]; then
-            # $INPUTS_COMPOSER_REQUIRE_EXTRA is explicitly not wrapped in double quotes below
-            # so that multiple requirements separated by spaces will work
-            composer require $INPUTS_COMPOSER_REQUIRE_EXTRA --no-update
-          fi
-          if [[ $MATRIX_COMPOSER_REQUIRE_EXTRA != "" ]]; then
-            # $MATRIX_COMPOSER_REQUIRE_EXTRA is explicitly not wrapped in double quotes below
-            # so that multiple requirements separated by spaces will work
-            composer require $MATRIX_COMPOSER_REQUIRE_EXTRA --no-update
-          fi
-
           # a) Ensure composer.json has prefer-stable true and minimum-stability dev
           # b) Update preferred-install to source for recipes and some modules that run
           #    other unit-tests in other modules
-          # c) Prevent installation of silverstripe/vendor-plugin < 1.5.2 which contains a bugfix
-          #    which is required for --prefer-lowest to install
-          #    https://github.com/silverstripe/vendor-plugin/pull/49
-          # d) Set version of PHP to make it easier to copy paste composer.json to local dev environment
           php -r '
             $j = json_decode(file_get_contents("composer.json"));
             $j->{"prefer-stable"} = true;
@@ -373,89 +326,154 @@ jobs:
             $j->config->{"preferred-install"}->{"cwp/*"} = "source";
             $j->config->{"preferred-install"}->{"tractorcow/*"} = "source";
             $j->config->{"preferred-install"}->{"*"} = "dist";
-            if (empty($j->conflict)) {
-              $j->conflict = new stdClass();
-            }
-            $j->conflict->{"silverstripe/vendor-plugin"} = "<1.5.2";
-            if (empty($j->config->platform)) {
-              $j->config->platform = new stdClass();
-            }
-            $j->config->platform->php = "${{ matrix.php }}";
             file_put_contents("composer.json", json_encode($j, JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES));
           '
 
-          # Enable plugins
-          composer config allow-plugins.composer/installers true
-          composer config allow-plugins.silverstripe/recipe-plugin true
-          composer config allow-plugins.silverstripe/vendor-plugin true
+          if [[ "${{ inputs.composer_install }}" == "true" ]]; then
+            if ! [[ -f composer.lock ]]; then
+              echo "composer_install input is true but there is no composer.lock file. Exiting."
+              exit 1
+            fi
+            composer install --prefer-source --no-interaction --no-progress
+          else
+            # If using phpunit9, ensure sminnee phpunit5 modules do not get installed
+            php -r '
+              $j = json_decode(file_get_contents("composer.json"));
+              $pu = $j->{"require-dev"}->{"phpunit/phpunit"} ?? "";
+              $rt = $j->{"require-dev"}->{"silverstripe/recipe-testing"} ?? "";
+              if ($pu == "^9" || $pu == "^9.5" || $rt == "^2" || $rt == "^3") {
+                if (!property_exists($j, "replace")) {
+                  $j->replace = new stdClass();
+                }
+                $j->replace->{"sminnee/phpunit"} = "*";
+                $j->replace->{"sminnee/phpunit-mock-objects"} = "*";
+                file_put_contents("composer.json", json_encode($j, JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES));
+              }
+            '
 
-          # matrix.composer_args sometimes includes `--prefer-lowest` which is only supported by `composer update`, not `composer install`
-          # Modules do not have composer.lock files, so `composer update` is the same speed as `composer install`
-          # `|| :` prevents an exit code on a failed composer update from halting the workflow
-          composer update --no-interaction --no-progress ${{ matrix.composer_args }} 2> __update_attempt.txt || :
+            # Required for any module/recipe that runs silverstripe/assets unit tests
+            # Should technically be defined as composer_require_extra on individual modules, though easier just doing here
+            # 1.6.10 is for --prefer-lowest and is the minimum version with php 8.1 support
+            composer require mikey179/vfsstream:^1.6.10 --dev --no-update
 
-          if ! [[ $(cat __update_attempt.txt) =~ Problem ]]; then
-            # Succesfully ran composer update and installed everything
-            rm __update_attempt.txt
-            # Useful to see generated composer.json when diagnosing new bugs
-            cat composer.json
-          elif ! [[ $(cat __update_attempt.txt) =~ 'Root composer.json requires silverstripe/installer' ]] || \
-            [[ $INPUTS_COMPOSER_REQUIRE_EXTRA =~ silverstripe/installer ]] || \
-            [[ $MATRIX_COMPOSER_REQUIRE_EXTRA =~ silverstripe/installer ]] || \
-            ! [[ "${{ matrix.installer_version }}" =~ ^[1-9]\.[0-9]+\.x\-dev$ ]]
-          then
-            # Failed to run composer update and will not attempt requiring different versions of silverstripe/installer
-            cat composer.json
-            cat __update_attempt.txt
-            # Using exit code 2 as it's the same code that composer uses when it fails
-            exit 2
-          elif [[ "${{ matrix.installer_version }}" =~ ^([1-9])\.([0-9]+)\.x\-dev$ ]]; then
-            # gha-generate-matrix will not always provide a compatibile version of silverstripe/installer due to
-            # limitations of knowing what versions of silverstripe/installer the pushed code is compatible with
-            # In this scenario we will usually end up with the latest minor x.dev version of silverstripe installer
-            # If it initially failed on composer update, try some earlier versions of silverstripe/installer
-            echo "Could not run composer update with version of silverstripe/installer, attempting earlier versions"
-            MAJOR=${BASH_REMATCH[1]}
-            MINOR=${BASH_REMATCH[2]}
-            SUCCESSFULLY_REQUIRED='false'
-            for MI in $(( MINOR - 1 )) $(( MINOR - 2 )); do
-              if [[ $SUCCESSFULLY_REQUIRED == 'false' ]]; then
-                # Test if $MI is a negative number
-                if [[ $MI =~ - ]]; then
-                  cat composer.json
-                  if [[ -f _require_attempt.txt ]]; then
-                    cat __require_attempt.txt
-                  else
-                    cat __update_attempt.txt
-                  fi
-                  echo 'Have run out of silverstripe/installer versions to attempt to require'
-                  exit 2
-                else
-                  VERSION="$MAJOR.$MI.x-dev"
-                  echo "Attempting to require silverstripe/installer $VERSION"
-                  composer require silverstripe/installer:$VERSION 2> __require_attempt.txt || :
-                  if ! [[ $(cat __require_attempt.txt) =~ Problem ]]; then
-                    SUCCESSFULLY_REQUIRED='true'
-                    echo "Succesfully required silverstripe/installer $VERSION"
-                    rm __require_attempt.txt
+            if [[ "${{ matrix.db }}" == "pgsql" ]] && ! [[ $GITHUB_REPOSITORY =~ /silverstripe-postgresql$ ]]; then
+              composer require "silverstripe/postgresql:^2 || ^3" --no-update
+            fi
+            if [[ "${{ matrix.endtoend }}" == "true" ]] && ! [[ $GITHUB_REPOSITORY =~ /recipe-testing$ ]]; then
+              composer require "silverstripe/recipe-testing:^2 || ^3" --dev --no-update
+            fi
+            if [[ "${{ matrix.phplinting }}" == "true" ]] && [[ -f .cow.json ]] && ! [[ $GITHUB_REPOSITORY =~ /cow$ ]]; then
+              # cow ~2.0 support guzzle 6 so is installable on older branches, dev-master supports guzzle 7
+              composer require "silverstripe/cow:~2.0 || dev-master" --dev --no-update
+            fi
+
+            # Require silverstripe/installer for non-recipes and all but a few modules
+            # Note: this block needs to be above COMPOSER_REQUIRE_EXTRA to allow that to override what is set here
+            if [[ "${{ matrix.installer_version }}" != "" ]]; then
+              composer require silverstripe/installer:${{ matrix.installer_version }} --no-update
+            fi
+
+            if [[ $INPUTS_COMPOSER_REQUIRE_EXTRA != "" ]]; then
+              # $INPUTS_COMPOSER_REQUIRE_EXTRA is explicitly not wrapped in double quotes below
+              # so that multiple requirements separated by spaces will work
+              composer require $INPUTS_COMPOSER_REQUIRE_EXTRA --no-update
+            fi
+            if [[ $MATRIX_COMPOSER_REQUIRE_EXTRA != "" ]]; then
+              # $MATRIX_COMPOSER_REQUIRE_EXTRA is explicitly not wrapped in double quotes below
+              # so that multiple requirements separated by spaces will work
+              composer require $MATRIX_COMPOSER_REQUIRE_EXTRA --no-update
+            fi
+
+            # a) Prevent installation of silverstripe/vendor-plugin < 1.5.2 which contains a bugfix
+            #    which is required for --prefer-lowest to install
+            #    https://github.com/silverstripe/vendor-plugin/pull/49
+            # b) Set version of PHP to make it easier to copy paste composer.json to local dev environment
+            php -r '
+              $j = json_decode(file_get_contents("composer.json"));
+              if (empty($j->conflict)) {
+                $j->conflict = new stdClass();
+              }
+              $j->conflict->{"silverstripe/vendor-plugin"} = "<1.5.2";
+              if (empty($j->config->platform)) {
+                $j->config->platform = new stdClass();
+              }
+              $j->config->platform->php = "${{ matrix.php }}";
+              file_put_contents("composer.json", json_encode($j, JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES));
+            '
+
+            # Enable plugins
+            composer config allow-plugins.composer/installers true
+            composer config allow-plugins.silverstripe/recipe-plugin true
+            composer config allow-plugins.silverstripe/vendor-plugin true
+
+            # matrix.composer_args sometimes includes `--prefer-lowest` which is only supported by `composer update`, not `composer install`
+            # Modules do not have composer.lock files, so `composer update` is the same speed as `composer install`
+            # `|| :` prevents an exit code on a failed composer update from halting the workflow
+            composer update --no-interaction --no-progress ${{ matrix.composer_args }} 2> __update_attempt.txt || :
+
+            if ! [[ $(cat __update_attempt.txt) =~ Problem ]]; then
+              # Succesfully ran composer update and installed everything
+              rm __update_attempt.txt
+              # Useful to see generated composer.json when diagnosing new bugs
+              cat composer.json
+            elif ! [[ $(cat __update_attempt.txt) =~ 'Root composer.json requires silverstripe/installer' ]] || \
+              [[ $INPUTS_COMPOSER_REQUIRE_EXTRA =~ silverstripe/installer ]] || \
+              [[ $MATRIX_COMPOSER_REQUIRE_EXTRA =~ silverstripe/installer ]] || \
+              ! [[ "${{ matrix.installer_version }}" =~ ^[1-9]\.[0-9]+\.x\-dev$ ]]
+            then
+              # Failed to run composer update and will not attempt requiring different versions of silverstripe/installer
+              cat composer.json
+              cat __update_attempt.txt
+              # Using exit code 2 as it's the same code that composer uses when it fails
+              exit 2
+            elif [[ "${{ matrix.installer_version }}" =~ ^([1-9])\.([0-9]+)\.x\-dev$ ]]; then
+              # gha-generate-matrix will not always provide a compatibile version of silverstripe/installer due to
+              # limitations of knowing what versions of silverstripe/installer the pushed code is compatible with
+              # In this scenario we will usually end up with the latest minor x.dev version of silverstripe installer
+              # If it initially failed on composer update, try some earlier versions of silverstripe/installer
+              echo "Could not run composer update with version of silverstripe/installer, attempting earlier versions"
+              MAJOR=${BASH_REMATCH[1]}
+              MINOR=${BASH_REMATCH[2]}
+              SUCCESSFULLY_REQUIRED='false'
+              for MI in $(( MINOR - 1 )) $(( MINOR - 2 )); do
+                if [[ $SUCCESSFULLY_REQUIRED == 'false' ]]; then
+                  # Test if $MI is a negative number
+                  if [[ $MI =~ - ]]; then
                     cat composer.json
+                    if [[ -f _require_attempt.txt ]]; then
+                      cat __require_attempt.txt
+                    else
+                      cat __update_attempt.txt
+                    fi
+                    echo 'Have run out of silverstripe/installer versions to attempt to require'
+                    exit 2
                   else
-                    echo "Failed to require silverstripe/installer $VERSION"
+                    VERSION="$MAJOR.$MI.x-dev"
+                    echo "Attempting to require silverstripe/installer $VERSION"
+                    composer require silverstripe/installer:$VERSION 2> __require_attempt.txt || :
+                    if ! [[ $(cat __require_attempt.txt) =~ Problem ]]; then
+                      SUCCESSFULLY_REQUIRED='true'
+                      echo "Succesfully required silverstripe/installer $VERSION"
+                      rm __require_attempt.txt
+                      cat composer.json
+                    else
+                      echo "Failed to require silverstripe/installer $VERSION"
+                    fi
                   fi
                 fi
+              done
+              if [[ $SUCCESSFULLY_REQUIRED == 'false' ]]; then
+                cat composer.json
+                cat __require_attempt.txt
+                exit 2
               fi
-            done
-            if [[ $SUCCESSFULLY_REQUIRED == 'false' ]]; then
+              rm __update_attempt.txt
+            else
+              # composer update failed for other reasons
               cat composer.json
-              cat __require_attempt.txt
+              cat __update_attempt.txt
               exit 2
             fi
-            rm __update_attempt.txt
-          else
-            # composer update failed for other reasons
-            cat composer.json
-            cat __update_attempt.txt
-            exit 2
           fi
 
           # Useful to see what was installed
