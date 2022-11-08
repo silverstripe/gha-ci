@@ -587,7 +587,7 @@ jobs:
               class: Monolog\Handler\StreamHandler
               constructor:
                 - "$GITHUB_WORKSPACE/silverstripe.log"
-                - "notice"
+                - "debug"
           EOF
           fi
 
