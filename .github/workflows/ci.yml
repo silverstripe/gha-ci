@@ -282,6 +282,8 @@ jobs:
           # pulls/4.10/mybranch => 4.10
           if [[ $BRANCH_OR_TAG =~ ^([1-9]+)$ ]] || \
              [[ $BRANCH_OR_TAG =~ ^([0-9]+\.[0-9]+)$ ]] || \
+             [[ $BRANCH_OR_TAG =~ ^([1-9]+)-release$ ]] || \
+             [[ $BRANCH_OR_TAG =~ ^([0-9]+\.[0-9]+)-release$ ]] || \
              [[ $BRANCH_OR_TAG =~ ^pulls/([1-9]+)/.+$ ]] || \
              [[ $BRANCH_OR_TAG =~ ^pulls/([0-9]+\.[0-9]+)/.+$ ]]; \
           then
