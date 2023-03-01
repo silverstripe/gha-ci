@@ -122,13 +122,22 @@ The version of PHP to run e.g. 8.1
 ###### db
 The database to run e.g. mysql80
 
-For the list of supported databases see [the gha-generate-matrix script](https://github.com/silverstripe/gha-generate-matrix/blob/main/job_creator.php)
+Valid `db` are:
+- pgsql
+- mysql57
+- mysql80
+- sqlite3
 
 ###### name_suffix
 Add a specific suffix to job and artifact names to make them easier to identify. This will be trucated if greater than 20 characters. Must match the regex `[a-zA-Z0-9_\- ]`
 
 ###### phpunit_suite
 The PHPUnit suite to run as defined in `phpunit.xml`. Translates to the `--testsuite` parameter passed to `phpunit`. Specify 'all' to run all PHPunit suites available in the context of this module/recipe
+
+###### preserve_vendor_tests
+By default, the workflow will want try to delete tests for modules in the `vendor` folder to avoid potential conflicts with tests rewritten for different PHPUnit versions. This behaviour is not always desirable because you may want to run those tests for your current build.
+
+Setting this input to `true` will preserve tests in the vendor folder.
 
 ###### endtoend_suite
 The end-to-end suite as defined in `behat.yml`. Must be defined, specify 'root' to run the default suite

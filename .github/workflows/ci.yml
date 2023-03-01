@@ -39,6 +39,10 @@ on:
       js:
         type: boolean
         default: true
+      preserve_vendor_tests:
+        type: boolean
+        default: false
+        description: Whether tests in the vendor folder should be preserved.
 
 jobs:
 
@@ -279,7 +283,8 @@ jobs:
           path: ~/.cache/composer
           key: shared-composer-cache
 
-      # Update composer.json and install dependencies
+      # Update composer.json and install dependencies such as Databases binaries to run the tests
+      # Note that SQLite3 doesn't need to be installed because it is bundle in the GitHub docker image.
       - name: Composer
         env:
           INPUTS_COMPOSER_REQUIRE_EXTRA: ${{ inputs.composer_require_extra }}
@@ -383,6 +388,9 @@ jobs:
 
             if [[ "${{ matrix.db }}" == "pgsql" ]] && ! [[ $GITHUB_REPOSITORY =~ /silverstripe-postgresql$ ]]; then
               composer require "silverstripe/postgresql:^2 || ^3" --no-update
+            fi
+            if [[ "${{ matrix.db }}" == "sqlite3" ]] && ! [[ $GITHUB_REPOSITORY =~ /silverstripe-sqlite3$ ]]; then
+              composer require "silverstripe/sqlite3:^2 || ^3" --no-update
             fi
             if [[ "${{ matrix.endtoend }}" == "true" ]] && ! [[ $GITHUB_REPOSITORY =~ /recipe-testing$ ]]; then
               composer require "silverstripe/recipe-testing:^2 || ^3" --dev --no-update
@@ -508,7 +516,8 @@ jobs:
           # Some older silverstripe vendor modules may still have the phpunit5 setUp() signatures without :void which when loaded will throw fatal PHP errors.
           # We cannot simply get rid of the 'tests' folders because behat requires vendor/silverstripe/[framework|cms]/tests/behat/serve-bootstrap.php
           # Recipes are excluded because the unit tests they run are in the required modules, and there's an assumption they'll require a compatible minor branch of the module
-          if ! [[ $GITHUB_REPOSITORY =~ /(recipe|silverstripe-installer) ]]; then
+
+          if [[ "${{ inputs.preserve_vendor_tests }}" == "false" ]] && ! [[ $GITHUB_REPOSITORY =~ /(recipe|silverstripe-installer) ]]; then
             echo "Repositiory is a not a recipe, removing unecessary vendor silverstripe unit tests"
             # Make an exception for 'ExtendTest.php' which is a misnamed TestOnly non-test class
             php -r '
@@ -575,13 +584,20 @@ jobs:
           SS_DATABASE_USERNAME="root"
           SS_DATABASE_PASSWORD="root"
           EOF
-          else
+          elif [[ "${{ matrix.db }}" =~ pgsql ]]; then
             cat << EOF > .env
           SS_DATABASE_CLASS="PostgreSQLDatabase"
           SS_DATABASE_SERVER="localhost"
           SS_DATABASE_PORT="5432"
           SS_DATABASE_USERNAME="postgres"
           SS_DATABASE_PASSWORD="postgres"
+          EOF
+          elif [[ "${{ matrix.db }}" =~ sqlite3 ]]; then
+            cat << EOF > .env
+          SS_DATABASE_CLASS="SQLite3Database"
+          SS_DATABASE_USERNAME="root"
+          SS_DATABASE_PASSWORD=""
+          SS_SQLITE_DATABASE_PATH=":memory:'"
           EOF
           fi
           cat << EOF >> .env
