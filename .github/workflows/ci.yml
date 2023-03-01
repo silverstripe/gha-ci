@@ -360,6 +360,8 @@ jobs:
               exit 1
             fi
             composer install --prefer-source --no-interaction --no-progress
+            # Useful to see composer.json when diagnosing new bugs
+            cat composer.json
           else
             # If using phpunit9, ensure sminnee phpunit5 modules do not get installed
             php -r '
