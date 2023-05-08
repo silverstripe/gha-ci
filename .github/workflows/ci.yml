@@ -151,7 +151,7 @@ jobs:
     steps:
 
       - name: Checkout code
-        uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5 # v2.7.0
+        uses: actions/checkout@8e5e7e5ab8b370d6c329ec480221332ada57f0ab # v3.5.2
 
       - name: Install PHP
         # SHA will need to be updated to support new php version when they are released
@@ -278,7 +278,7 @@ jobs:
       # need to download requirements for the first time, after that it will be plenty quick
       # https://docs.github.com/en/actions/advanced-guides/caching-dependencies-to-speed-up-workflows
       - name: Enable shared composer cache
-        uses: actions/cache@2b250bc32ad02700b996b496c14ac8c2840a2991 # @v2.1.8
+        uses: actions/cache@88522ab9f39a2ea568f7027eddc7d8d8bc9d59c8 # @v3.3.1
         with:
           path: ~/.cache/composer
           key: shared-composer-cache
