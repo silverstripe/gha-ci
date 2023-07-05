@@ -433,6 +433,19 @@ jobs:
               file_put_contents("composer.json", json_encode($j, JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES));
             '
 
+            # Ensure that the branch-alias dev-master branch of tractorcow/silverstripe-fluent isn't
+            # used instead of 7.x-dev when running kitchen-sink
+            if [[ $GITHUB_REPOSITORY =~ /recipe-kitchen-sink$ ]]; then
+              php -r '
+                $j = json_decode(file_get_contents("composer.json"));
+                if (empty($j->conflict)) {
+                  $j->conflict = new stdClass();
+                }
+                $j->conflict->{"tractorcow/silverstripe-fluent"} = "dev-master";
+                file_put_contents("composer.json", json_encode($j, JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES));
+              '
+            fi
+
             # Enable plugins
             composer config allow-plugins.composer/installers true
             composer config allow-plugins.silverstripe/recipe-plugin true
