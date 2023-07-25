@@ -739,12 +739,77 @@ jobs:
           name: ${{ env.artifacts_name }}
           path: artifacts
 
+  checkgovernance:
+    name: Check governance
+    runs-on: ubuntu-latest
+    needs: 'genmatrix'
+    outputs:
+      can_tag: ${{ steps.check-governance.outputs.can_tag }}
+    env:
+      GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      GITHUB_REF_NAME: ${{ github.ref_name }}
+      MATRICES: ${{ needs.genmatrix.outputs.matrix }}
+    steps:
+
+      - name: Check governance
+        id: check-governance
+        run: |
+          CAN_TAG=0
+
+          # If we own it, then we can tag it
+          if [[ $GITHUB_REPOSITORY_OWNER == "silverstripe" ]]; then
+            echo "Repository is in the silverstripe organisation"
+            CAN_TAG=1
+          fi
+
+          # If we don't own it, we can only tag it if it's a supported module
+          if [[ $CAN_TAG == "0" ]]; then
+            # The installer version is the same for all generated matrices in a given run
+            CMS_VERSION=$(echo $MATRICES | jq -r '.include[0].installer_version')
+            # If the installer version wasn't an expected semver constraint, we're doing something weird
+            if ! [[ $CMS_VERSION =~ ^([0-9]+)(\.[0-9]+)?\.(x-dev$|[0-9]+(-(alpha|rc|beta)[0-9]+)?$) ]]; then
+              echo "Unexpected installer version '$CMS_VERSION' - couldn't check supported modules list"
+            else
+              CMS_MAJOR=${BASH_REMATCH[1]}
+              # We don't really care if this is a "valid" branch per se (that is checked in gaugerelease)
+              # we just need enough information to get what will be the major release portion of the branch name.
+              if ! [[ $GITHUB_REF_NAME =~ ^[0-9]+ ]]; then
+                echo "Current branch '$GITHUB_REF_NAME' doesn't start with a number"
+              else
+                BRANCH_MAJOR=${BASH_REMATCH[0]}
+                echo "Checking for supported modules in CMS $CMS_MAJOR against branch major $BRANCH_MAJOR"
+                curl -s -o __modules.json https://raw.githubusercontent.com/silverstripe/supported-modules/$CMS_MAJOR/modules.json
+                if ! jq -e '.' __modules.json >/dev/null 2>&1; then
+                  # If there is some error getting the file (e.g. 404 if $CMS_MAJOR is some value we don't have a file for),
+                  # the error will be in the __modules.json file - importantly, not in JSON format.
+                  echo "Cannot parse supported-modules JSON. Aborting. The content we tried to parse was:"
+                  cat __modules.json
+                  # We need to echo a new line here because for some reason without it the next echo is sometimes
+                  # appended to the last line of the cat
+                  echo ""
+                else
+                  SUPPORTED_BRANCHES=$(jq -r --arg repo ${GITHUB_REPOSITORY} 'map(select(.github == $repo))[].branches[]' __modules.json)
+                  SUPPORTED_BRANCH=$(echo $SUPPORTED_BRANCHES | grep -Po "$BRANCH_MAJOR" | head -n 1)
+                  if [[ $SUPPORTED_BRANCH == "" ]]; then
+                    echo "Not a supported module or branch"
+                  else
+                    echo "Repository is supported"
+                    CAN_TAG=1
+                  fi
+                fi
+              fi
+            fi
+          fi
+
+          echo "can_tag output is $CAN_TAG"
+          echo "can_tag=$CAN_TAG" >> $GITHUB_OUTPUT
+
   gaugerelease:
     name: Check unreleased changes
     runs-on: ubuntu-latest
-    needs: tests
-    # TODO: restricted to silverstripe/silverstripe-framework - remove once we've validated this whole thing works
-    if: ${{ github.repository == 'silverstripe/silverstripe-framework' && github.repository_owner == 'silverstripe' && (github.event_name == 'push' ||  github.event_name == 'schedule' ||  github.event_name == 'workflow_dispatch') }}
+    needs: [tests, checkgovernance]
+    if: ${{ needs.checkgovernance.outputs.can_tag == '1' && (github.event_name == 'push' ||  github.event_name == 'schedule' ||  github.event_name == 'workflow_dispatch') }}
     env:
       GITHUB_REPOSITORY: ${{ github.repository }}
       GITHUB_REF_NAME: ${{ github.ref_name }}
