@@ -206,6 +206,10 @@ jobs:
       - name: Install additional requirements 
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}
+          # These are used by aws-cli, which is pre-installed in github actions, used for silverstripe/dynamodb
+          AWS_ACCESS_KEY_ID: myaccesskey
+          AWS_SECRET_ACCESS_KEY: mysecret
+          AWS_DEFAULT_REGION: ap-southeast-2
         run: |
           if [[ "${{ matrix.endtoend }}" == "true" ]]; then
             sudo apt install -y software-properties-common
@@ -251,18 +255,37 @@ jobs:
           if [[ $GITHUB_REPOSITORY =~ /(silverstripe-spellcheck|recipe-authoring-tools)$ ]] || [[ "${{ matrix.phpunit_suite }}" == "recipe-authoring-tools" ]]; then
             sudo apt install -y hunspell libhunspell-dev hunspell-en-us
           fi
-          if [[ $GITHUB_REPOSITORY =~ /(silverstripe-dynamodb)$ ]]; then
+          if [[ $GITHUB_REPOSITORY =~ /(silverstripe-dynamodb)$ ]] && [[ ${{ matrix.phpunit }} == "true" ]]; then
             # install dynamodb
+            # https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.DownloadingAndRunning.html
             mkdir _dynamodb
             cd _dynamodb
-            sudo wget https://s3.ap-southeast-1.amazonaws.com/dynamodb-local-singapore/dynamodb_local_latest.tar.gz
-            sudo tar -xf dynamodb_local_latest.tar.gz
+            wget https://d1ni2b6xgvw0s0.cloudfront.net/v2.x/dynamodb_local_latest.tar.gz
+            wget https://d1ni2b6xgvw0s0.cloudfront.net/v2.x/dynamodb_local_latest.tar.gz.sha256
+            if [[ $(shasum -a 256 dynamodb_local_latest.tar.gz) != $(cat dynamodb_local_latest.tar.gz.sha256) ]]; then
+              echo "shasum for dynamodb_local_latest.tar.gz does not match"
+              exit 1
+            fi
+            tar -xvzf dynamodb_local_latest.tar.gz
+
             # run dynamo db as background process
             # java openjdk 11 is pre-installed
             $(java -Djava.library.path=./DynamoDBLocal_lib -jar DynamoDBLocal.jar) &
-            for i in {1..10}; do
-              if ! [[ $(ps -aux | grep DynamoDBLocal.jar) =~ DynamoDBLocal_lib ]]; then
-                if [[ $i == 10 ]]; then
+            for i in {1..20}; do
+              JAR_RUNNING=0
+              if [[ $(ps -aux | grep DynamoDBLocal.jar) =~ DynamoDBLocal_lib ]]; then
+                JAR_RUNNING=1
+              fi
+              # ping port 8000 - connection will quickly by auto closed by dynamodb
+              PORT_8000_RESPONDING=0
+              if [[ $JAR_RUNNING == 1 ]]; then
+                # telnet is preinstalled on github actions
+                if [[ $(telnet 127.0.0.1 8000) =~ 'Connected to 127.0.0.1' ]]; then
+                  PORT_8000_RESPONDING=1
+                fi
+              fi
+              if [[ $JAR_RUNNING == 0 ]] || [[ $PORT_8000_RESPONDING == 0 ]]; then
+                if [[ $i == 20 ]]; then
                   echo "dynamodb failed to start"
                   exit 1
                 fi
@@ -273,6 +296,13 @@ jobs:
                 break
               fi
             done
+
+            # create dynamodb table
+            # aws-cli comes pre-installed in github actions
+            aws dynamodb create-table --table-name mysession --attribute-definitions AttributeName=id,AttributeType=S --key-schema AttributeName=id,KeyType=HASH --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 --endpoint-url http://localhost:8000
+            # list tables to console for easier debugging
+            aws dynamodb list-tables --endpoint-url http://localhost:8000
+            
             cd -
           fi
 
@@ -665,8 +695,8 @@ jobs:
             cat << EOF >> .env
           AWS_DYNAMODB_ENDPOINT="http://localhost:8000"
           AWS_DYNAMODB_SESSION_TABLE=mysession
-          AWS_ACCESS_KEY=my-access-key
-          AWS_SECRET_KEY=my-secret
+          AWS_ACCESS_KEY=myaccesskey
+          AWS_SECRET_KEY=mysecret
           AWS_REGION_NAME=ap-southeast-2
           EOF
           fi
@@ -771,6 +801,14 @@ jobs:
         with:
           name: ${{ env.artifacts_name }}
           path: artifacts
+
+      - name: Delete temporary files
+        if: always()
+        run: |
+          # deleting the _dynamodb dir while java is running DynamoDBLocal.jar does not seem to matter
+          if [[ -d _dynamodb ]]; then
+            rm -rf _dynamodb
+          fi
 
   checkgovernance:
     name: Check governance
