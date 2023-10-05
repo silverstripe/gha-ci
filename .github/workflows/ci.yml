@@ -678,7 +678,7 @@ jobs:
           SS_DATABASE_CLASS="SQLite3Database"
           SS_DATABASE_USERNAME="root"
           SS_DATABASE_PASSWORD=""
-          SS_SQLITE_DATABASE_PATH=":memory:'"
+          SS_SQLITE_DATABASE_PATH=":memory:"
           EOF
           fi
           cat << EOF >> .env
@@ -851,7 +851,9 @@ jobs:
                 BRANCH_MAJOR=${BASH_REMATCH[0]}
                 echo "Checking for supported modules in CMS $CMS_MAJOR against branch major $BRANCH_MAJOR"
                 curl -s -o __modules.json https://raw.githubusercontent.com/silverstripe/supported-modules/$CMS_MAJOR/modules.json
-                if ! jq -e '.' __modules.json >/dev/null 2>&1; then
+                # If we can't parse the JSON at all, $MODULES will be an empty string and that means we couldn't fetch the file.
+                MODULES=$(jq -e '.' __modules.json) || true
+                if [[ $MODULES == "" ]]; then
                   # If there is some error getting the file (e.g. 404 if $CMS_MAJOR is some value we don't have a file for),
                   # the error will be in the __modules.json file - importantly, not in JSON format.
                   echo "Cannot parse supported-modules JSON. Aborting. The content we tried to parse was:"
