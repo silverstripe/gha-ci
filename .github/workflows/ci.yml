@@ -92,7 +92,7 @@ jobs:
     steps:
       - name: Generate matrix
         id: generate-matrix
-        uses: sabina-talipova/gha-generate-matrix@v1.9
+        uses: silverstripe/gha-generate-matrix@785c70a3fa97d7ad3b9d4065cb737c0e6a068a60
         with:
           composer_install: ${{ inputs.composer_install }}
           extra_jobs: ${{ inputs.extra_jobs }}
