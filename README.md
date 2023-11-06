@@ -127,6 +127,7 @@ Valid `db` are:
 - mysql57
 - mysql80
 - sqlite3
+- mariadb
 
 ###### name_suffix
 Add a specific suffix to job and artifact names to make them easier to identify. This will be trucated if greater than 20 characters. Must match the regex `[a-zA-Z0-9_\- ]`
