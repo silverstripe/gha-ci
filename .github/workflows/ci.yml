@@ -145,6 +145,15 @@ jobs:
         options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=10
         ports:
           - 5432:5432
+      mariadb:
+        image: mariadb
+        env:
+          MARIADB_HOST: 127.0.0.1
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: SS_mysite
+        ports:
+          - 3311:3306
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=10s --health-timeout=5s --health-retries=10
 
     env:
       artifacts_name: ${{ matrix.name }}
@@ -679,6 +688,13 @@ jobs:
           SS_DATABASE_USERNAME="root"
           SS_DATABASE_PASSWORD=""
           SS_SQLITE_DATABASE_PATH=":memory:"
+          EOF
+          elif [[ "${{ matrix.db }}" =~ mariadb ]]; then
+            cat << EOF > .env
+          SS_DATABASE_SERVER="127.0.0.1"
+          SS_DATABASE_PORT="3311"
+          SS_DATABASE_USERNAME="root"
+          SS_DATABASE_PASSWORD="root"
           EOF
           fi
           cat << EOF >> .env
