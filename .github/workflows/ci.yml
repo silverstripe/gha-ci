@@ -210,6 +210,17 @@ jobs:
           if [[ "${{ matrix.phpcoverage }}" != "true" ]]; then
             sudo sh -c "echo ';zend_extension=xdebug.so' > /etc/php/${{ matrix.php }}/mods-available/xdebug.ini"
           fi
+
+          # Remove php8.x-psr extension which may be pre-installed with ubuntu
+          # The extension adds a PHP PsrExt namespace aliased to Psr and the implementation of
+          # PsrExt\Log\LoggerInterface::emergency() has a signature that conflicts with Monolog\Logger::emergency()
+          match=$(sudo dpkg --get-selections | grep php | grep psr) || true
+          if [[ "$match" =~ ^(php[0-9\.]+\-psr) ]]; then
+            extension=${BASH_REMATCH[1]};
+            sudo apt remove "$extension"
+            echo "Removed PHP extension $extension"
+          fi
+
           echo "PHP has been configured"
 
       - name: Install additional requirements 
