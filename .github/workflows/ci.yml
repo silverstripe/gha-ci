@@ -539,6 +539,7 @@ jobs:
             composer config allow-plugins.composer/installers true
             composer config allow-plugins.silverstripe/recipe-plugin true
             composer config allow-plugins.silverstripe/vendor-plugin true
+            composer config allow-plugins.phpstan/extension-installer true
 
             # matrix.composer_args sometimes includes `--prefer-lowest` which is only supported by `composer update`, not `composer install`
             # Modules do not have composer.lock files, so `composer update` is the same speed as `composer install`
