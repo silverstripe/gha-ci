@@ -664,51 +664,60 @@ jobs:
         env:
           GITHUB_WORKSPACE: ${{ github.workspace }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          NEEDS_FULL_SETUP: ${{ matrix.needs_full_setup }}
         run: |
-          # Add .env file and create artifacts directory
-          # Note: the wonky indentation is intentional so there is no space at the start of
-          # each newline in the .env file
-          if [[ "${{ matrix.db }}" =~ mysql ]]; then
-            if [[ "${{ matrix.db }}" == "mysql57pdo" ]]; then
-              cat << EOF > .env
+          # Artifacts directory must be created after composer install as it would remove the artifacts directory
+          # This seems a bit strange, if you need to add an artifact at an earlier stage then revalidate that
+          # composer install does actually remove the artifact directory
+          mkdir artifacts
+
+          if [[ $NEEDS_FULL_SETUP == 'false' ]]; then
+            echo "skipping .env, database, and other full site setup steps"
+          else
+            # Add .env file and create artifacts directory
+            # Note: the wonky indentation is intentional so there is no space at the start of
+            # each newline in the .env file
+            if [[ "${{ matrix.db }}" =~ mysql ]]; then
+              if [[ "${{ matrix.db }}" == "mysql57pdo" ]]; then
+                cat << EOF > .env
           SS_DATABASE_CLASS="MySQLPDODatabase"
           SS_DATABASE_PORT="3357"
           EOF
-            else
-              cat << EOF > .env
+              else
+                cat << EOF > .env
           SS_DATABASE_CLASS="MySQLDatabase"
           SS_DATABASE_PORT="${{ matrix.db == 'mysql57' && '3357' || '3380' }}"
           EOF
-            fi
-            cat << EOF >> .env
+              fi
+              cat << EOF >> .env
           SS_DATABASE_SERVER="127.0.0.1"
           SS_DATABASE_USERNAME="root"
           SS_DATABASE_PASSWORD="root"
           EOF
-          elif [[ "${{ matrix.db }}" =~ pgsql ]]; then
-            cat << EOF > .env
+            elif [[ "${{ matrix.db }}" =~ pgsql ]]; then
+              cat << EOF > .env
           SS_DATABASE_CLASS="PostgreSQLDatabase"
           SS_DATABASE_SERVER="localhost"
           SS_DATABASE_PORT="5432"
           SS_DATABASE_USERNAME="postgres"
           SS_DATABASE_PASSWORD="postgres"
           EOF
-          elif [[ "${{ matrix.db }}" =~ sqlite3 ]]; then
-            cat << EOF > .env
+            elif [[ "${{ matrix.db }}" =~ sqlite3 ]]; then
+              cat << EOF > .env
           SS_DATABASE_CLASS="SQLite3Database"
           SS_DATABASE_USERNAME="root"
           SS_DATABASE_PASSWORD=""
           SS_SQLITE_DATABASE_PATH=":memory:"
           EOF
-          elif [[ "${{ matrix.db }}" =~ mariadb ]]; then
-            cat << EOF > .env
+            elif [[ "${{ matrix.db }}" =~ mariadb ]]; then
+              cat << EOF > .env
           SS_DATABASE_SERVER="127.0.0.1"
           SS_DATABASE_PORT="3311"
           SS_DATABASE_USERNAME="root"
           SS_DATABASE_PASSWORD="root"
           EOF
-          fi
-          cat << EOF >> .env
+            fi
+            cat << EOF >> .env
           SS_ENVIRONMENT_TYPE="dev"
           SS_DATABASE_NAME="SS_mysite"
           SS_DEFAULT_ADMIN_USERNAME="admin"
@@ -718,23 +727,23 @@ jobs:
           SS_BASE_URL="http://localhost"
           EOF
 
-          if [[ $GITHUB_REPOSITORY =~ /(silverstripe-dynamodb)$ ]]; then
-            cat << EOF >> .env
+            if [[ $GITHUB_REPOSITORY =~ /(silverstripe-dynamodb)$ ]]; then
+              cat << EOF >> .env
           AWS_DYNAMODB_ENDPOINT="http://localhost:8000"
           AWS_DYNAMODB_SESSION_TABLE=mysession
           AWS_ACCESS_KEY=myaccesskey
           AWS_SECRET_KEY=mysecret
           AWS_REGION_NAME=ap-southeast-2
           EOF
-          fi
+            fi
 
-          # debug
-          echo ".env is"
-          cat .env
+            # debug
+            echo ".env is"
+            cat .env
 
-          # silverstripe logging
-          if [[ -d "./app/_config/" ]]; then
-            cat << EOF >> app/_config/my-logger.yml
+            # silverstripe logging
+            if [[ -d "./app/_config/" ]]; then
+              cat << EOF >> app/_config/my-logger.yml
           ---
           Name: error-logging
           After: '*'
@@ -749,28 +758,24 @@ jobs:
                 - "$GITHUB_WORKSPACE/silverstripe.log"
                 - "debug"
           EOF
-          fi
+            fi
 
-          # Artifacts directory must be created after composer install as it would remove the artifacts directory
-          # This seems a bit strange, if you need to add an artifact at an earlier stage then revalidate that
-          # composer install does actually remove the artifact directory
-          mkdir artifacts
+            # run dev/build flush to help debug any issues (though it's not strictly required here)
+            # normal module
+            if [[ -f vendor/bin/sake ]]; then
+              vendor/bin/sake dev/build flush=1
+            fi
+            # framework module
+            if [[ -f sake ]]; then
+              ./sake dev/build flush=1
+            fi
 
-          # run dev/build flush to help debug any issues (though it's not strictly required here)
-          # normal module
-          if [[ -f vendor/bin/sake ]]; then
-            vendor/bin/sake dev/build flush=1
+            # Delete the silverstripe-cache dir - it will automatically recreate when needed
+            # There were issues with a unit test getting the following issue
+            # Identifier name 'SilverStripe_CampaignAdmin_Tests_AddToCampaignValidatorTest_TestObject' is too long
+            # Likely because the /tmp/silverstripe-cache-php7.4.xyz... dir being out of sync with TestOnly objects
+            rm -rf $(find /tmp -maxdepth 1 | grep silverstripe-cache)
           fi
-          # framework module
-          if [[ -f sake ]]; then
-            ./sake dev/build flush=1
-          fi
-
-          # Delete the silverstripe-cache dir - it will automatically recreate when needed
-          # There were issues with a unit test getting the following issue
-          # Identifier name 'SilverStripe_CampaignAdmin_Tests_AddToCampaignValidatorTest_TestObject' is too long
-          # Likely because the /tmp/silverstripe-cache-php7.4.xyz... dir being out of sync with TestOnly objects
-          rm -rf $(find /tmp -maxdepth 1 | grep silverstripe-cache)
 
       - name: Debug
         run: |
