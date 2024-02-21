@@ -222,6 +222,8 @@ jobs:
           fi
 
           echo "PHP has been configured"
+          echo "PHP info:"
+          php -i
 
       - name: Install additional requirements 
         env:
@@ -680,14 +682,19 @@ jobs:
             # each newline in the .env file
             if [[ "${{ matrix.db }}" =~ mysql ]]; then
               if [[ "${{ matrix.db }}" == "mysql57pdo" ]]; then
+                echo "mysql version":
+                mysql --port=3357 --version
                 cat << EOF > .env
           SS_DATABASE_CLASS="MySQLPDODatabase"
           SS_DATABASE_PORT="3357"
           EOF
               else
+                MYSQL_PORT=${{ matrix.db == 'mysql57' && '3357' || '3380' }}
+                echo "mysql version":
+                mysql --port=$MYSQL_PORT --version
                 cat << EOF > .env
           SS_DATABASE_CLASS="MySQLDatabase"
-          SS_DATABASE_PORT="${{ matrix.db == 'mysql57' && '3357' || '3380' }}"
+          SS_DATABASE_PORT="${MYSQL_PORT}"
           EOF
               fi
               cat << EOF >> .env
@@ -696,6 +703,8 @@ jobs:
           SS_DATABASE_PASSWORD="root"
           EOF
             elif [[ "${{ matrix.db }}" =~ pgsql ]]; then
+              echo "postgres version:"
+              psql --version
               cat << EOF > .env
           SS_DATABASE_CLASS="PostgreSQLDatabase"
           SS_DATABASE_SERVER="localhost"
@@ -704,6 +713,8 @@ jobs:
           SS_DATABASE_PASSWORD="postgres"
           EOF
             elif [[ "${{ matrix.db }}" =~ sqlite3 ]]; then
+              echo "sqlite version":
+              sqlite3 --version
               cat << EOF > .env
           SS_DATABASE_CLASS="SQLite3Database"
           SS_DATABASE_USERNAME="root"
@@ -711,6 +722,8 @@ jobs:
           SS_SQLITE_DATABASE_PATH=":memory:"
           EOF
             elif [[ "${{ matrix.db }}" =~ mariadb ]]; then
+              echo "mariadb version":
+              mysql --port=3311 --version
               cat << EOF > .env
           SS_DATABASE_SERVER="127.0.0.1"
           SS_DATABASE_PORT="3311"
