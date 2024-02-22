@@ -146,7 +146,7 @@ jobs:
         ports:
           - 5432:5432
       mariadb:
-        image: mariadb
+        image: mariadb:11.2
         env:
           MARIADB_HOST: 127.0.0.1
           MARIADB_ROOT_PASSWORD: root
@@ -683,7 +683,7 @@ jobs:
             if [[ "${{ matrix.db }}" =~ mysql ]]; then
               if [[ "${{ matrix.db }}" == "mysql57pdo" ]]; then
                 echo "mysql version":
-                mysql --port=3357 --user=root --password=root --execute="SELECT VERSION();" || true
+                mysql --host=127.0.0.1 --port=3357 --user=root --password=root --execute="SELECT VERSION();" || true
                 cat << EOF > .env
           SS_DATABASE_CLASS="MySQLPDODatabase"
           SS_DATABASE_PORT="3357"
@@ -691,7 +691,7 @@ jobs:
               else
                 MYSQL_PORT=${{ matrix.db == 'mysql57' && '3357' || '3380' }}
                 echo "mysql version":
-                mysql --user=root --password=root --port=$MYSQL_PORT --execute="SELECT VERSION();" || true
+                mysql --host=127.0.0.1 --user=root --password=root --port=$MYSQL_PORT --execute="SELECT VERSION();" || true
                 cat << EOF > .env
           SS_DATABASE_CLASS="MySQLDatabase"
           SS_DATABASE_PORT="${MYSQL_PORT}"
@@ -719,7 +719,7 @@ jobs:
           EOF
             elif [[ "${{ matrix.db }}" =~ mariadb ]]; then
               echo "mariadb version":
-              mysql --port=3311 --user=root --password=root --execute="SELECT VERSION();" || true
+              mysql --host=127.0.0.1 --port=3311 --user=root --password=root --execute="SELECT VERSION();" || true
               cat << EOF > .env
           SS_DATABASE_SERVER="127.0.0.1"
           SS_DATABASE_PORT="3311"
