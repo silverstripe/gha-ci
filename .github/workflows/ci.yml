@@ -683,7 +683,7 @@ jobs:
             if [[ "${{ matrix.db }}" =~ mysql ]]; then
               if [[ "${{ matrix.db }}" == "mysql57pdo" ]]; then
                 echo "mysql version":
-                mysql --port=3357 --version
+                mysql --port=3357 --user=root --password=root --execute="SELECT VERSION();" || true
                 cat << EOF > .env
           SS_DATABASE_CLASS="MySQLPDODatabase"
           SS_DATABASE_PORT="3357"
@@ -691,7 +691,7 @@ jobs:
               else
                 MYSQL_PORT=${{ matrix.db == 'mysql57' && '3357' || '3380' }}
                 echo "mysql version":
-                mysql --port=$MYSQL_PORT --version
+                mysql --user=root --password=root --port=$MYSQL_PORT --execute="SELECT VERSION();" || true
                 cat << EOF > .env
           SS_DATABASE_CLASS="MySQLDatabase"
           SS_DATABASE_PORT="${MYSQL_PORT}"
@@ -703,8 +703,6 @@ jobs:
           SS_DATABASE_PASSWORD="root"
           EOF
             elif [[ "${{ matrix.db }}" =~ pgsql ]]; then
-              echo "postgres version:"
-              psql --version
               cat << EOF > .env
           SS_DATABASE_CLASS="PostgreSQLDatabase"
           SS_DATABASE_SERVER="localhost"
@@ -713,8 +711,6 @@ jobs:
           SS_DATABASE_PASSWORD="postgres"
           EOF
             elif [[ "${{ matrix.db }}" =~ sqlite3 ]]; then
-              echo "sqlite version":
-              sqlite3 --version
               cat << EOF > .env
           SS_DATABASE_CLASS="SQLite3Database"
           SS_DATABASE_USERNAME="root"
@@ -723,7 +719,7 @@ jobs:
           EOF
             elif [[ "${{ matrix.db }}" =~ mariadb ]]; then
               echo "mariadb version":
-              mysql --port=3311 --version
+              mysql --port=3311 --user=root --password=root --execute="SELECT VERSION();" || true
               cat << EOF > .env
           SS_DATABASE_SERVER="127.0.0.1"
           SS_DATABASE_PORT="3311"
