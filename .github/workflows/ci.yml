@@ -146,7 +146,7 @@ jobs:
         ports:
           - 5432:5432
       mariadb:
-        image: mariadb:11.2
+        image: mariadb:10.11
         env:
           MARIADB_HOST: 127.0.0.1
           MARIADB_ROOT_PASSWORD: root
