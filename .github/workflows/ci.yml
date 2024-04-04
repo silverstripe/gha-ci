@@ -39,6 +39,9 @@ on:
       js:
         type: boolean
         default: true
+      doclinting:
+        type: boolean
+        default: true
       preserve_vendor_tests:
         type: boolean
         default: false
@@ -104,6 +107,7 @@ jobs:
           phplinting: ${{ inputs.phplinting }}
           phpunit: ${{ inputs.phpunit }}
           js: ${{ inputs.js }}
+          doclinting: ${{ inputs.doclinting }}
 
   # For each job in the matrix, setup an environment and run the tests
   tests:
@@ -803,6 +807,7 @@ jobs:
           endtoend_suite: ${{ matrix.endtoend_suite }}
           endtoend_config: ${{ matrix.endtoend_config }}
           js: ${{ matrix.js }}
+          doclinting: ${{ matrix.doclinting }}
 
       - name: Output latest SHA
         id: output-sha
