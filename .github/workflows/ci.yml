@@ -226,8 +226,6 @@ jobs:
           fi
 
           echo "PHP has been configured"
-          echo "PHP info:"
-          php -i
 
       - name: Install additional requirements 
         env:
