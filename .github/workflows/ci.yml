@@ -282,6 +282,40 @@ jobs:
             sudo apt install -y hunspell libhunspell-dev hunspell-en-us
           fi
           if [[ $GITHUB_REPOSITORY =~ /(silverstripe-dynamodb)$ ]] && [[ ${{ matrix.phpunit }} == "true" ]]; then
+            # Update to newer version of java otherwise will be incompatible version of runtime
+            # when trying to run dynamodb
+            # java openjdk 11 is pre-installed - it uses a 'Temurin' distribution
+            # https://adoptium.net/temurin/releases/
+            # openjdk version "11.0.22" 2024-01-16
+            # OpenJDK Runtime Environment Temurin-11.0.22+7 (build 11.0.22+7)
+            # OpenJDK 64-Bit Server VM Temurin-11.0.22+7 (build 11.0.22+7, mixed mode)
+            echo "Pre-installed version of java"
+            java -version
+            # remove the link to the old version of java
+            if [[ -f /usr/bin/java ]]; then
+              sudo rm /usr/bin/java
+            fi
+            # Install manually rather than using apt install openjdk-21-jre-headless
+            # because for whatever reason the old temurin version will reappear on /usr/bin/java
+            # if you attempt to install with apt
+            wget https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jre_x64_linux_hotspot_21.0.2_13.tar.gz
+            if [[ $(shasum -a 256 OpenJDK21U-jre_x64_linux_hotspot_21.0.2_13.tar.gz | cut -d " " -f 1) != "51141204fe01a9f9dd74eab621d5eca7511eac67315c9975dbde5f2625bdca55" ]]; then
+              echo "shasum for OpenJDK21U-jre_x64_linux_hotspot_21.0.2_13.tar.gz did not match"
+              exit 1
+            fi
+            if [[ -d _java ]]; then
+              echo "Unexpected _java dir found"
+              exit 1
+            fi
+            mkdir _java
+            mv OpenJDK21U-jre_x64_linux_hotspot_21.0.2_13.tar.gz _java
+            cd _java
+            tar -xvzf OpenJDK21U-jre_x64_linux_hotspot_21.0.2_13.tar.gz
+            sudo ln -s $(pwd)/jdk-21.0.2+13-jre/bin/java /usr/bin/java
+            echo "New version of java"
+            java -version
+            cd -
+
             # install dynamodb
             # https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/DynamoDBLocal.DownloadingAndRunning.html
             mkdir _dynamodb
@@ -295,7 +329,6 @@ jobs:
             tar -xvzf dynamodb_local_latest.tar.gz
 
             # run dynamo db as background process
-            # java openjdk 11 is pre-installed
             $(java -Djava.library.path=./DynamoDBLocal_lib -jar DynamoDBLocal.jar) &
             for i in {1..20}; do
               JAR_RUNNING=0
@@ -854,7 +887,12 @@ jobs:
         run: |
           # deleting the _dynamodb dir while java is running DynamoDBLocal.jar does not seem to matter
           if [[ -d _dynamodb ]]; then
+            echo "Deleting temporary _dynamodb directory"
             rm -rf _dynamodb
+          fi
+          if [[ -d _java ]]; then
+            echo "Deleting temporary _java directory"
+            rm -rf _java
           fi
 
   checkgovernance:
