@@ -76,8 +76,8 @@ Dynamically generate a matrix using feature detection. If disabled, jobs must be
 `dynamic_matrix: false`
 
 ##### Documentation linting
-Runs linting against documentation using [silverstripe/documentation-lint](https://github.com/silverstripe/documentation-lint/) if the `.doclintrc` config file is available. Default is true, disable with:
-`doclinting: false`
+Runs linting against documentation using [silverstripe/documentation-lint](https://github.com/silverstripe/documentation-lint/) if the `.doclintrc` config file is available. Default is false, enable with:
+`doclinting: true`
 
 ##### PHPUnit tests
 Runs PHPunit if the `phpunit.xml` or `phpunit.xml.dist` config file is available. Default is true, disable PHPunit tests with:
