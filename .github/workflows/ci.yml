@@ -47,6 +47,8 @@ on:
         default: false
         description: Whether tests in the vendor folder should be preserved.
 
+permissions: {}
+
 jobs:
 
   # Writes various github variables to the console for debugging purposes
@@ -981,6 +983,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: gaugerelease
     if: ${{ needs.gaugerelease.outputs.do_release == '1' }}
+    permissions:
+      contents: write
     steps:
       - name: Patch release
         uses: silverstripe/gha-tag-release@v1
