@@ -547,13 +547,16 @@ jobs:
             # a) Prevent installation of silverstripe/vendor-plugin < 1.5.2 which contains a bugfix
             #    which is required for --prefer-lowest to install
             #    https://github.com/silverstripe/vendor-plugin/pull/49
-            # b) Set version of PHP to make it easier to copy paste composer.json to local dev environment
+            # b) Prevent installation of silverstripe/behat-extension < 4.12.0/5.3.0 which contains a new
+            #    is_ci config option - trying to set this option without support will cause a fatal error
+            # c) Set version of PHP to make it easier to copy paste composer.json to local dev environment
             php -r '
               $j = json_decode(file_get_contents("composer.json"));
               if (empty($j->conflict)) {
                 $j->conflict = new stdClass();
               }
               $j->conflict->{"silverstripe/vendor-plugin"} = "<1.5.2";
+              $j->conflict->{"silverstripe/behat-extension"} = "<4.12.0 || <5.3.0 >=5";
               if (empty($j->config->platform)) {
                 $j->config->platform = new stdClass();
               }
