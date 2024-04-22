@@ -96,7 +96,7 @@ jobs:
 
     permissions:
       contents: read
-      pull-request: read
+      pull-requests: read
 
     steps:
       - name: Generate matrix
