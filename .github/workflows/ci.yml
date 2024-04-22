@@ -93,7 +93,11 @@ jobs:
     # gha-generate-matrix script.php will sanitise matrix outputs so they're safe to use within bash
     outputs:
       matrix: ${{ steps.generate-matrix.outputs.matrix }}
-    
+
+    permissions:
+      contents: read
+      pull-requests: read
+
     steps:
       - name: Generate matrix
         id: generate-matrix
@@ -168,6 +172,9 @@ jobs:
 
     outputs:
       latest_local_sha: ${{ steps.output-sha.outputs.latest_local_sha }}
+
+    permissions:
+      contents: read
 
     steps:
 
