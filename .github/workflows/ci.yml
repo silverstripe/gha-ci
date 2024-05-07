@@ -945,7 +945,7 @@ jobs:
               else
                 BRANCH_MAJOR=${BASH_REMATCH[0]}
                 echo "Checking for supported modules in CMS $CMS_MAJOR against branch major $BRANCH_MAJOR"
-                curl -s -o __modules.json https://raw.githubusercontent.com/silverstripe/supported-modules/$CMS_MAJOR/modules.json
+                curl -s -o __modules.json https://raw.githubusercontent.com/silverstripe/supported-modules/main/repositories.json
                 # If we can't parse the JSON at all, $MODULES will be an empty string and that means we couldn't fetch the file.
                 MODULES=$(jq -e '.' __modules.json) || true
                 if [[ $MODULES == "" ]]; then
@@ -957,13 +957,26 @@ jobs:
                   # appended to the last line of the cat
                   echo ""
                 else
-                  SUPPORTED_BRANCHES=$(jq -r --arg repo ${GITHUB_REPOSITORY} 'map(select(.github == $repo))[].branches[]' __modules.json)
-                  SUPPORTED_BRANCH=$(echo $SUPPORTED_BRANCHES | grep -Po "$BRANCH_MAJOR" | head -n 1)
-                  if [[ $SUPPORTED_BRANCH == "" ]]; then
-                    echo "Not a supported module or branch"
+                  SUPPORTED_BRANCHES=$(jq -r --arg repo ${GITHUB_REPOSITORY} --arg cmsmajor ${CMS_MAJOR}  '.[] | map(select(.github == $repo))[].majorVersionMapping | .[$cmsmajor]' __modules.json)
+                  if [[ $SUPPORTED_BRANCHES == "null" ]]; then
+                    # Check if this repository has a mapping against arbitrary CMS majors.
+                    # This is represented by a major version mapping of "*" to either an empty array, or an array with the current branch in it.
+                    SUPPORTED_BRANCHES=$(jq -r --arg repo ${GITHUB_REPOSITORY}  '.[] | map(select(.github == $repo))[].majorVersionMapping | select(has("*"))[]' __modules.json)
+                    if [[ $SUPPORTED_BRANCHES == "[]" || $(echo '["5"]' | jq -r --arg branch ${BRANCH_MAJOR} 'index($branch)') != "null" ]]; then
+                      echo "Repository is supported"
+                      CAN_TAG=1
+                    else
+                      echo "Not a supported module or branch"
+                    fi
                   else
-                    echo "Repository is supported"
-                    CAN_TAG=1
+                    # We have an array of branches - check if the branch major is included
+                    SUPPORTED_BRANCH=$(echo $SUPPORTED_BRANCHES | grep -Po "$BRANCH_MAJOR" | head -n 1)
+                    if [[ $SUPPORTED_BRANCH == "" ]]; then
+                      echo "Not a supported module or branch"
+                    else
+                      echo "Repository is supported"
+                      CAN_TAG=1
+                    fi
                   fi
                 fi
               fi
