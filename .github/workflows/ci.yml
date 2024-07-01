@@ -610,6 +610,37 @@ jobs:
               cat __update_attempt.txt
               # Using exit code 2 as it's the same code that composer uses when it fails
               exit 2
+            elif [[ "${{ matrix.composer_args }}" =~ --prefer-lowest ]]; then
+              # --prefer-lowest builds start with the lowest version of silverstripe/intaller for non-core modules
+              # These will not install if there are core requirements in the modules composer.json that require
+              # a newer version of a core requirement
+              # Increment the version of installer up until something installs
+              echo "Could not run composer update with version of silverstripe/installer, attempting a later version"
+              [[ "${{ matrix.installer_version }}" =~ ^([1-9])\.0\.x\-dev$ ]]
+              MAJOR=${BASH_REMATCH[1]}
+              SUCCESSFULLY_REQUIRED='false'
+              # Previously we attemped <major>.0.x-dev, try up to <major>.4.x-dev which should be the highest minor
+              for MI in 1 2 3 4; do
+                if [[ $SUCCESSFULLY_REQUIRED == 'false' ]]; then
+                  VERSION="$MAJOR.$MI.x-dev"
+                  echo "Attempting to require silverstripe/installer $VERSION"
+                  composer require silverstripe/installer:$VERSION 2> __require_attempt.txt || :
+                  if ! [[ $(cat __require_attempt.txt) =~ Problem ]]; then
+                    SUCCESSFULLY_REQUIRED='true'
+                    echo "Succesfully required silverstripe/installer $VERSION"
+                    rm __require_attempt.txt
+                    cat composer.json
+                  else
+                    echo "Failed to require silverstripe/installer $VERSION"
+                  fi
+                fi
+              done
+              if [[ $SUCCESSFULLY_REQUIRED == 'false' ]]; then
+                cat composer.json
+                cat __require_attempt.txt
+                exit 2
+              fi
+              rm __update_attempt.txt
             elif [[ "${{ matrix.installer_version }}" =~ ^([1-9])\.([0-9]+)\.x\-dev$ ]]; then
               # gha-generate-matrix will not always provide a compatibile version of silverstripe/installer due to
               # limitations of knowing what versions of silverstripe/installer the pushed code is compatible with
