@@ -590,6 +590,34 @@ jobs:
             composer config allow-plugins.silverstripe/vendor-plugin true
             composer config allow-plugins.phpstan/extension-installer true
 
+            # If --prefer-lowest is set, then use the lowest possible version of silverstripe/installer
+            if [[ "${{ matrix.composer_args }}" =~ --prefer-lowest ]] && [[ "${{ matrix.installer_version }}" != "" ]]; then
+
+              # First remove the version of silverstripe/installer in composer.json
+              # This version was originally worked out in gha-generate-matrix
+              composer remove silverstripe/installer --no-update
+
+              # Next require the lowest possible version of silverstripe/installer
+              # Due to a limitation of composer, we have to use --no-install rather than --no-update to
+              # resolve the lowest version. This will create a composer.lock file which we don't actually want
+              echo "Running composer require silverstripe/installer --quiet --prefer-lowest --no-install"
+              composer require silverstripe/installer --quiet --prefer-lowest --no-install
+              rm composer.lock
+
+              # It will have used a ^ caret view e.g. ^5.1 rather than 5.1.x-dev.
+              # We'll extract the version from composer.json and manually update it to use .x-dev instead
+              # Note that using prefer-stable:false does NOT automatically use .x-dev, you're likely to end
+              # up with an @beta version instead
+              php -r '
+                $j = json_decode(file_get_contents("composer.json"));
+                $v = $j->require->{"silverstripe/installer"};
+                $v = str_replace("^", "", $v) . ".x-dev";
+                $j->require->{"silverstripe/installer"} = $v;
+                $c = json_encode($j, JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES);
+                file_put_contents("composer.json", $c);
+              '
+            fi
+
             # matrix.composer_args sometimes includes `--prefer-lowest` which is only supported by `composer update`, not `composer install`
             # Modules do not have composer.lock files, so `composer update` is the same speed as `composer install`
             # `|| :` prevents an exit code on a failed composer update from halting the workflow
