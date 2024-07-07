@@ -611,7 +611,9 @@ jobs:
               php -r '
                 $j = json_decode(file_get_contents("composer.json"));
                 $v = $j->require->{"silverstripe/installer"};
-                $v = str_replace("^", "", $v) . ".x-dev";
+                if (strpos($v, '^') === 0) {
+                  $v = str_replace("^", "", $v) . ".x-dev";
+                }
                 $j->require->{"silverstripe/installer"} = $v;
                 $c = json_encode($j, JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES);
                 file_put_contents("composer.json", $c);
