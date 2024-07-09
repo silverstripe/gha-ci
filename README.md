@@ -83,6 +83,10 @@ Runs linting against documentation using [silverstripe/documentation-lint](https
 Runs PHPunit if the `phpunit.xml` or `phpunit.xml.dist` config file is available. Default is true, disable PHPunit tests with:
 `phpunit: false`
 
+##### Skip PHPUnit suites
+Skips specific PHPUnit suites in the dynamically generated matrix. Default is to run all suites. Configure with:
+`phpunit_skip_suites: suite-to-skip,another-to-skip`
+
 ##### PHP linting
 Runs phpcs and phpstan if the `phpcs.xml.dist` or `phpstan.neon.dist` config files are available. Default is true, disable with:
 `phplinting: false`
@@ -104,7 +108,7 @@ Runs `yarn lint`, `yarn test` and `yarn build` + `git diff-files` + `git diff` i
 `js: false`
 
 ##### Extra jobs
-Define specific test combinations (e.g. php and db versions). All inputs are false by default so you only need to include config for the input(s) you want enabled. All inputs except `dynamic_matrix` and `simple_matrix` are available in this context. There are also some additional inputs specific to the extra_jobs input (see below). Use a multi-line yml string
+Define specific test combinations (e.g. php and db versions). All inputs are false by default so you only need to include config for the input(s) you want enabled. All inputs except `dynamic_matrix`, `simple_matrix`, and `phpunit_skip_suites` are available in this context. There are also some additional inputs specific to the extra_jobs input (see below). Use a multi-line yml string
 ```yml
 extra_jobs: |
   - php: '8.0'
@@ -149,3 +153,6 @@ The end-to-end suite as defined in `behat.yml`. Must be defined, specify 'root' 
 
 ###### endtoend_config
 The `behat.yml` config file to use if not using the root `behat.yml`. Only used if running behat tests in a different module
+
+###### install_in_memory_cache_exts
+Must be true or false. Determines whether to install in-memory cache extensions for framework unit tests.

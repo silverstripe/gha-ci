@@ -36,6 +36,10 @@ on:
       phpunit:
         type: boolean
         default: true
+      phpunit_skip_suites:
+        type: string
+        required: false
+        default: ''
       js:
         type: boolean
         default: true
@@ -112,6 +116,7 @@ jobs:
           phpcoverage_force_off: ${{ inputs.phpcoverage_force_off }}
           phplinting: ${{ inputs.phplinting }}
           phpunit: ${{ inputs.phpunit }}
+          phpunit_skip_suites: ${{ inputs.phpunit_skip_suites }}
           js: ${{ inputs.js }}
           doclinting: ${{ inputs.doclinting }}
 
@@ -197,6 +202,8 @@ jobs:
           # COMPOSER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure PHP
+        env:
+          INSTALL_IN_MEMORY_CACHE_EXTS: ${{ matrix.install_in_memory_cache_exts }}
         run: |
           # Set memory limit and disable xdebug if not running phpcoverage
           if [[ -z $(which php) ]]; then
@@ -232,6 +239,13 @@ jobs:
             extension=${BASH_REMATCH[1]};
             sudo apt remove "$extension"
             echo "Removed PHP extension $extension"
+          fi
+
+          if [[ $INSTALL_IN_MEMORY_CACHE_EXTS == 'true' ]]; then
+            sudo apt-get install php${{ matrix.php }}-memcached
+            sudo sh -c "echo 'apc.enable_cli=On' >> /etc/php/${{ matrix.php }}/cli/php.ini"
+            echo 'Installed in-memory cache extensions and set APCu to be enabled'
+            echo 'Note that Redis will be added as a composer dependency'
           fi
 
           echo "PHP has been configured"
@@ -424,6 +438,7 @@ jobs:
         env:
           INPUTS_COMPOSER_REQUIRE_EXTRA: ${{ inputs.composer_require_extra }}
           MATRIX_COMPOSER_REQUIRE_EXTRA: ${{ matrix.composer_require_extra }}
+          INSTALL_IN_MEMORY_CACHE_EXTS: ${{ matrix.install_in_memory_cache_exts }}
           PARENT_BRANCH: ${{ matrix.parent_branch }}
           # https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
           # github.base_ref is only available on pull-requests events is the target branch - is is NOT prefixed with refs/heads/
@@ -532,6 +547,9 @@ jobs:
             fi
             if [[ "${{ matrix.endtoend }}" == "true" ]] && ! [[ $GITHUB_REPOSITORY =~ /recipe-testing$ ]]; then
               composer require "silverstripe/recipe-testing:^2 || ^3 || ^4" --dev --no-update
+            fi
+            if [[ $INSTALL_IN_MEMORY_CACHE_EXTS == 'true' ]]; then
+                composer require predis/predis --no-update
             fi
 
             # Require silverstripe/installer for non-recipes and all but a few modules
