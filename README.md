@@ -21,10 +21,15 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   ci:
     name: CI
     uses: silverstripe/gha-ci/.github/workflows/ci.yml@v1
+    permissions:
+      pull-requests: read
+      contents: write
 ```
 
 #### Running on a regular schedule
@@ -35,6 +40,8 @@ on:
   schedule:
   - cron: '0 0 * * 1'
 
+permissions: {}
+
 jobs:
   ci:
     name: CI
@@ -42,7 +49,17 @@ jobs:
     # Change '<account_name>' to match the name of the account hosting this repository
     if: (github.event_name == 'schedule' && github.repository_owner == '<account_name>') || (github.event_name != 'schedule')
     uses: silverstripe/gha-ci/.github/workflows/ci.yml@v1
+    permissions:
+      pull-requests: read
+      contents: write
 ```
+
+> [!WARNING]
+> Note that the `contents: write` permission won't be used in third-party repositories, but still needs to be defined. This permission is required by [silverstripe/gha-tag-release](https://github.com/silverstripe/gha-tag-release) which will be skipped in all repositories which are not commercially supported or not in the "silverstripe" GitHub organisation.
+>
+> To ensure you protect yourself from malicious actors, we recommend you set the "Fork pull request workflows from outside collaborators" setting in `https://github.com/<org>/<repo>/settings/actions` to one of
+> - Require approval for first-time contributors
+> - Require approval for all outside collaborators
 
 #### Job configuration
 
