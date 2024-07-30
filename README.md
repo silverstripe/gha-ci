@@ -21,9 +21,14 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   ci:
     name: CI
+    permissions:
+      pull-requests: read
+      contents: read
     uses: silverstripe/gha-ci/.github/workflows/ci.yml@v1
 ```
 
@@ -35,9 +40,14 @@ on:
   schedule:
   - cron: '0 0 * * 1'
 
+permissions: {}
+
 jobs:
   ci:
     name: CI
+    permissions:
+      pull-requests: read
+      contents: read
     # Only run the cron on the account hosting this repository, not on the accounts of forks
     # Change '<account_name>' to match the name of the account hosting this repository
     if: (github.event_name == 'schedule' && github.repository_owner == '<account_name>') || (github.event_name != 'schedule')
