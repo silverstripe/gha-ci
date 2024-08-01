@@ -894,6 +894,7 @@ jobs:
           endtoend: ${{ matrix.endtoend }}
           endtoend_suite: ${{ matrix.endtoend_suite }}
           endtoend_config: ${{ matrix.endtoend_config }}
+          endtoend_tags: ${{ matrix.endtoend_tags }}
           js: ${{ matrix.js }}
           doclinting: ${{ matrix.doclinting }}
 
