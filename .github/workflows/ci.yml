@@ -274,16 +274,14 @@ jobs:
             # remove old symlink - note /usr/bin/google-chrome-stable is removed by apt remove above
             sudo rm /usr/bin/chromedriver
 
-            # Get latest versions of chrome + chromedriver from json endpoint
-            curl https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions-with-downloads.json > chrome.json
-
+            # Get last known version of chrome + chromedriver that doesn't differ from actual user experience
             # Install chrome
-            wget $(cat chrome.json | jq -r '.channels.Stable.downloads.chrome[] | select(.platform == "linux64").url')
+            wget https://storage.googleapis.com/chrome-for-testing-public/126.0.6478.182/linux64/chrome-linux64.zip
             unzip chrome-linux64.zip
             sudo ln -s $(pwd)/chrome-linux64/chrome /usr/bin/chrome
 
             # Install chromedriver
-            wget $(cat chrome.json | jq -r '.channels.Stable.downloads.chromedriver[] | select(.platform == "linux64").url')
+            wget https://storage.googleapis.com/chrome-for-testing-public/126.0.6478.182/linux64/chromedriver-linux64.zip
             unzip chromedriver-linux64.zip
             sudo ln -s $(pwd)/chromedriver-linux64/chromedriver /usr/bin/chromedriver
 
@@ -295,7 +293,6 @@ jobs:
             echo "Chromedriver version is: $(chromedriver --version)"
 
             # Remove temporary files
-            rm chrome.json
             rm chrome-linux64.zip
             rm chromedriver-linux64.zip
           fi
