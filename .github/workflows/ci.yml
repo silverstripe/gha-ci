@@ -1038,6 +1038,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [tests, checkgovernance]
     if: ${{ (github.event_name == 'push' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && needs.checkgovernance.outputs.can_tag == '1' }}
+    permissions:
+      actions: write
     env:
       GITHUB_REPOSITORY: ${{ github.repository }}
       BRANCH: ${{ github.ref_name }}
@@ -1047,10 +1049,6 @@ jobs:
         shell: bash
         id: dispatch-tag-patch-release
         run: |
-          if ! [[ -f .github/workflows/tag-patch-release.yml ]]; then
-            echo "tag-patch-release.yml not present. Skipping."
-            exit 0
-          fi
           # https://docs.github.com/en/rest/actions/workflows?apiVersion=2022-11-28#create-a-workflow-dispatch-event
           RESP_CODE=$(curl -w %{http_code} -s -L -o __response.json \
             -X POST \
@@ -1060,6 +1058,10 @@ jobs:
             https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/tag-patch-release.yml/dispatches \
             -d "{\"ref\":\"$BRANCH\",\"inputs\":{\"latest_local_sha\":\"${{ needs.tests.outputs.latest_local_sha }}\"}}"
           )
+          if [[ $RESP_CODE == "404" ]]; then
+            echo "tag-patch-release.yml not present."
+            exit 0
+          fi
           if [[ $RESP_CODE != "204" ]]; then
             echo "Failed to dispatch workflow - HTTP response code was $RESP_CODE"
             cat __response.json
