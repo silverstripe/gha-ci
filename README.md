@@ -12,6 +12,9 @@ Note: Unlike other silverstripe/gha-* repositories, this one is a [reusable work
 
 Create the following file in your module, and substitute the tagged version for the most recent tag prefixed with a `v` e.g. `@v1`
 
+> [!WARNING]
+> Note that the `actions: write` permission won't be used in third-party repositories, but still needs to be defined. This permission is required because in commercially supported repositories and repositories in the "silverstripe" GitHub organisation we dispatch a separate workflow which tags patch releases.
+
 **.github/workflows/ci.yml**
 ```yml
 name: CI
@@ -29,6 +32,7 @@ jobs:
     permissions:
       pull-requests: read
       contents: read
+      actions: write
     uses: silverstripe/gha-ci/.github/workflows/ci.yml@v1
 ```
 
@@ -48,6 +52,7 @@ jobs:
     permissions:
       pull-requests: read
       contents: read
+      actions: write
     # Only run the cron on the account hosting this repository, not on the accounts of forks
     # Change '<account_name>' to match the name of the account hosting this repository
     if: (github.event_name == 'schedule' && github.repository_owner == '<account_name>') || (github.event_name != 'schedule')
