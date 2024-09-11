@@ -629,7 +629,7 @@ jobs:
                 if (strpos($v, "^") === 0) {
                   $v = str_replace("^", "", $v) . ".x-dev";
                   // Remove @beta, @rc, or @alpha if they're there
-                  $v = preg_replace('/@(alpha|beta|rc)/', '', $v);
+                  $v = preg_replace("/@(alpha|beta|rc)/", "", $v);
                 }
                 $j->require->{"silverstripe/installer"} = $v;
                 $c = json_encode($j, JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES);
