@@ -628,6 +628,8 @@ jobs:
                 $v = $j->require->{"silverstripe/installer"};
                 if (strpos($v, "^") === 0) {
                   $v = str_replace("^", "", $v) . ".x-dev";
+                  // Remove @beta, @rc, or @alpha if they're there
+                  $v = preg_replace('/@(alpha|beta|rc)/', '', $v);
                 }
                 $j->require->{"silverstripe/installer"} = $v;
                 $c = json_encode($j, JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES);
@@ -910,24 +912,27 @@ jobs:
         env:
           GITHUB_WORKSPACE: ${{ github.workspace }}
         run: |
+          if ! [[ -d artifacts ]]; then
+            mkdir artifacts
+          fi
           # Copy selected files to the artifacts dir
           if [[ -f composer.json ]]; then
-            cp composer.json artifacts
+            cp composer.json artifacts/
           fi
           if [[ -f composer.lock ]]; then
-            cp composer.lock artifacts
+            cp composer.lock artifacts/
           fi
           if [[ "${{ matrix.endtoend }}" == "true" ]] && [[ -f __behat.yml ]]; then
-            cp __behat.yml artifacts
+            cp __behat.yml artifacts/
           fi
           if [[ -f ${APACHE_LOG_DIR}/error.log ]]; then
-            cp ${APACHE_LOG_DIR}/error.log artifacts
+            cp ${APACHE_LOG_DIR}/error.log artifacts/
           fi
           if [[ -f ${APACHE_LOG_DIR}/access.log ]]; then
-            cp ${APACHE_LOG_DIR}/access.log artifacts
+            cp ${APACHE_LOG_DIR}/access.log artifacts/
           fi
           if [[ -f $GITHUB_WORKSPACE/silverstripe.log ]]; then
-            cp $GITHUB_WORKSPACE/silverstripe.log artifacts
+            cp $GITHUB_WORKSPACE/silverstripe.log artifacts/
           fi
 
       # https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts
