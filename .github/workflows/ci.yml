@@ -542,6 +542,12 @@ jobs:
             if [[ "${{ matrix.db }}" == "sqlite3" ]] && ! [[ $GITHUB_REPOSITORY =~ /silverstripe-sqlite3$ ]]; then
               composer require "silverstripe/sqlite3:^2 || ^3" --no-update
             fi
+            if [[ "${{ matrix.db }}" == "sqlite3" ]]; then
+              sqlite_link="https://www.sqlite.org/2023/sqlite-tools-linux-x64-3440200.zip"
+              wget "$sqlite_link" -P /tmp
+              unzip "/tmp/$(basename "$sqlite_link")" -d /tmp
+              sudo install /tmp/sqlite3 /usr/local/bin/
+            fi
             if [[ "${{ matrix.endtoend }}" == "true" ]] && ! [[ $GITHUB_REPOSITORY =~ /recipe-testing$ ]]; then
               composer require "silverstripe/recipe-testing:^2 || ^3 || ^4" --dev --no-update
             fi
