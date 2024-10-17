@@ -171,7 +171,7 @@ jobs:
         options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=10s --health-timeout=5s --health-retries=10
 
     env:
-      artifacts_name: ${{ matrix.name }}
+      artifacts_name: ${{ matrix.artifacts_name }}
 
     name: ${{ matrix.name }}
 
@@ -1070,7 +1070,7 @@ jobs:
           fi
 
           FOUND_WORKFLOW=0
-          WORKFLOWS=$(jq -r '.workflows[].path' __response.json)
+          WORKFLOWS=$(jq -r '.workflows[] | select(.state == "active") | .path' __response.json)
           while IFS= read -r WORKFLOW_PATH; do
             if [[ "$WORKFLOW_PATH" == ".github/workflows/tag-patch-release.yml" ]]; then
               echo "Found tag-patch-release.yml"
