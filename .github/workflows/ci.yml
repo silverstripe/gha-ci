@@ -187,6 +187,8 @@ jobs:
           # apt install extra requirements as required
           if [[ "${{ matrix.endtoend }}" == "true" ]]; then
             sudo apt install -y software-properties-common
+            # Remove legacy apt sources entry before installing PPA
+            [ -f /etc/apt/sources.list.d/ondrej-php.list ] && sudo rm /etc/apt/sources.list.d/ondrej-php.list
             sudo add-apt-repository -y ppa:ondrej/php
             sudo add-apt-repository -y ppa:ondrej/apache2
             sudo apt update
