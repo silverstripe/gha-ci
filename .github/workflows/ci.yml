@@ -649,6 +649,15 @@ jobs:
                 $c = json_encode($j, JSON_PRETTY_PRINT + JSON_UNESCAPED_SLASHES);
                 file_put_contents("composer.json", $c);
               '
+
+              # Special case for silverstripe/htmleditor-tinymce 1.x-dev --prefer-lowest which will
+              # attempt to use installer @6.0.0-alpha1, changed to 6.0.x-dev above because
+              # that module was not included in silverstripe/installer 6.0.0-alpha1, though is included
+              # in silverstripe/installer 6.0.0-beta1
+              if [[ $GITHUB_REPOSITORY =~ /silverstripe-htmleditor-tinymce ]] && [[ $COMPOSER_ROOT_VERSION == "1.x-dev" ]]; then
+                composer remove silverstripe/installer --no-update
+                composer require silverstripe/installer 6.x-dev --quiet --no-install
+              fi
             fi
 
             # matrix.composer_args sometimes includes `--prefer-lowest` which is only supported by `composer update`, not `composer install`
