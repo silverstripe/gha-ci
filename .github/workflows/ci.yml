@@ -268,7 +268,10 @@ jobs:
           AWS_DEFAULT_REGION: ap-southeast-2
         run: |
           if [[ "${{ matrix.endtoend }}" == "true" ]]; then
-            # ppa:ondrej/php appears to be already added, though ppa:ondrej/apache2 is not
+            # Neither ppa:ondrej/php nor ppa:ondrej/apache2 are added by default.
+            # ppa:ondrej/php must be added explicitly - while shivammathur/setup-php installs the PHP CLI,
+            # it does not leave the PPA registered in apt sources, which is needed for libapache2-mod-php below.
+            sudo add-apt-repository -y ppa:ondrej/php
             sudo add-apt-repository -y ppa:ondrej/apache2
 
             # Run apt update allowing for a change in the "Label" field which has happened at least once after the
