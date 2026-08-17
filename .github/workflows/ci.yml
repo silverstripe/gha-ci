@@ -905,7 +905,7 @@ jobs:
           echo "matrix.phpunit: ${{ matrix.phpunit }}"
 
       - name: Run tests
-        uses: silverstripe/gha-run-tests@v1
+        uses: silverstripe/gha-run-tests@v2
         with:
           phpunit: ${{ matrix.phpunit }}
           phpunit_suite: ${{ matrix.phpunit_suite }}
