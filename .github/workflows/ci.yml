@@ -503,6 +503,8 @@ jobs:
           # a) Ensure composer.json has prefer-stable true and minimum-stability dev
           # b) Update preferred-install to source for recipes and some modules that run
           #    other unit-tests in other modules
+          # c) Do not block installing packages with security advisories, as CI installs dev branches
+          #    of release lines that may have unfixed medium or low advisories
           php -r '
             $j = json_decode(file_get_contents("composer.json"));
             $j->{"prefer-stable"} = true;
@@ -510,6 +512,13 @@ jobs:
             if (empty($j->config)) {
               $j->config = new stdClass();
             }
+            if (empty($j->config->policy)) {
+              $j->config->policy = new stdClass();
+            }
+            if (empty($j->config->policy->advisories)) {
+              $j->config->policy->advisories = new stdClass();
+            }
+            $j->config->policy->advisories->block = false;
             if (empty($j->config->{"preferred-install"})) {
               $j->config->{"preferred-install"} = new stdClass();
             }
