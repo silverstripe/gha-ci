@@ -210,6 +210,30 @@ jobs:
           #env:
           # COMPOSER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Add apt repositories
+        run: |
+          if [[ "${{ matrix.endtoend }}" != "true" ]] && [[ "${{ matrix.install_in_memory_cache_exts }}" != "true" ]]; then
+            echo "No additional apt repositories required" && exit 0
+          fi
+
+          # ppa:ondrej/php and ppa:ondrej/apache2 are not published for Ubuntu 26.04 onwards
+          # packages.sury.org replaces them and has every PHP version for both Ubuntu 24.04 and 26.04
+          # Only add a repository if it isn't already registered, e.g. by shivammathur/setup-php, as registering it
+          # twice with a different signed-by keyring will cause apt update to fail
+          CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
+          curl -fsSLo /tmp/debsuryorg-archive-keyring.deb https://packages.sury.org/debsuryorg-archive-keyring.deb
+          sudo dpkg -i /tmp/debsuryorg-archive-keyring.deb
+          for REPO in php apache2; do
+            if ! grep -rqs "packages.sury.org/$REPO" /etc/apt/sources.list /etc/apt/sources.list.d/; then
+              echo "deb [signed-by=/usr/share/keyrings/debsuryorg-archive-keyring.gpg] https://packages.sury.org/$REPO/ $CODENAME main" | sudo tee /etc/apt/sources.list.d/sury-$REPO.list
+            fi
+          done
+
+          # Run apt update allowing for a change in the "Label" field which has happened at least once after the
+          # maintainer changed the label field, causing apt to exit with status code of 100
+          # See https://manpages.debian.org/unstable/apt/apt-get.8.en.html under the `--allow-releaseinfo-change` heading
+          sudo apt update --allow-releaseinfo-change-label
+
       - name: Configure PHP
         env:
           INSTALL_IN_MEMORY_CACHE_EXTS: ${{ matrix.install_in_memory_cache_exts }}
@@ -251,7 +275,7 @@ jobs:
           fi
 
           if [[ $INSTALL_IN_MEMORY_CACHE_EXTS == 'true' ]]; then
-            sudo apt-get install php${{ matrix.php }}-memcached
+            sudo apt-get install -y php${{ matrix.php }}-memcached
             sudo sh -c "echo 'apc.enable_cli=On' >> /etc/php/${{ matrix.php }}/cli/php.ini"
             echo 'Installed in-memory cache extensions and set APCu to be enabled'
             echo 'Note that Redis will be added as a composer dependency'
@@ -268,16 +292,9 @@ jobs:
           AWS_DEFAULT_REGION: ap-southeast-2
         run: |
           if [[ "${{ matrix.endtoend }}" == "true" ]]; then
-            # ppa:ondrej/php appears to be already added, though ppa:ondrej/apache2 is not
-            sudo add-apt-repository -y ppa:ondrej/apache2
-
-            # Run apt update allowing for a change in the "Label" field which has happened at least once after the
-            # maintainer changed the label field, causing apt to exit with status code of 100
-            # See https://manpages.debian.org/unstable/apt/apt-get.8.en.html under the `--allow-releaseinfo-change` heading
-            sudo apt update --allow-releaseinfo-change-label
-
             # The requirements from libnss3-dev onwards are for chrome-testing to run properly
-            sudo apt install -y software-properties-common libapache2-mod-php${{ matrix.php }} libnss3-dev libgdk-pixbuf2.0-dev libgtk-3-dev libxss-dev
+            # libgdk-pixbuf2.0-dev was renamed to libgdk-pixbuf-2.0-dev, the old name does not exist in Ubuntu 26.04
+            sudo apt install -y software-properties-common libapache2-mod-php${{ matrix.php }} libnss3-dev libgdk-pixbuf-2.0-dev libgtk-3-dev libxss-dev
 
             # ubuntu-latest comes with a current version of google-chrome-stable and chromedriver
             # however we want to use the https://developer.chrome.com/blog/chrome-for-testing/ to match
@@ -432,6 +449,17 @@ jobs:
           # run apache as 'runner:docker' instead of 'www-data:www-data'
           sudo sh -c "echo 'export APACHE_RUN_USER=runner' >> /etc/apache2/envvars"
           sudo sh -c "echo 'export APACHE_RUN_GROUP=docker' >> /etc/apache2/envvars"
+          # From Ubuntu 26.04 apache2.service is sandboxed - ProtectHome=read-only prevents writing to the
+          # project in /home/runner, and MemoryDenyWriteExecute=yes prevents PHP from using PCRE JIT
+          cat << EOF > __apache2-override.conf
+          [Service]
+          ProtectHome=no
+          MemoryDenyWriteExecute=no
+          EOF
+          sudo mkdir -p /etc/systemd/system/apache2.service.d
+          sudo cp __apache2-override.conf /etc/systemd/system/apache2.service.d/override.conf
+          rm __apache2-override.conf
+          sudo systemctl daemon-reload
           sudo systemctl restart apache2
           echo "Apache has been configured"
 
