@@ -625,7 +625,7 @@ jobs:
               composer require "silverstripe/sqlite3:^2 || ^3" --no-update
             fi
             if [[ "${{ matrix.endtoend }}" == "true" ]] && ! [[ $GITHUB_REPOSITORY =~ /recipe-testing$ ]]; then
-              composer require "silverstripe/recipe-testing:^2 || ^3 || ^4" --dev --no-update
+              composer require "silverstripe/recipe-testing:^2 || ^3 || ^4 || ^5" --dev --no-update
             fi
             if [[ $INSTALL_IN_MEMORY_CACHE_EXTS == 'true' ]]; then
                 composer require predis/predis --no-update
